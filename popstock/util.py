@@ -21,7 +21,7 @@ def wave_energy(waveform_generator, injection_parameters):
     # Could make this into a FrequencySeries...
     return np.abs(polarizations['plus'])**2 + np.abs(polarizations['cross'])**2 
 
-def omega_gw(frequencies, wave_energies, weights, T_observation=1):
+def omega_gw(frequencies, wave_energies, weights,  Rate_norm=1.e-3):
     """
     Compute Omega GW spectrum given a set of wave energy spectra and associated weights.
 
@@ -40,8 +40,8 @@ def omega_gw(frequencies, wave_energies, weights, T_observation=1):
     =======
     The wave energy spectrum in a np.array.
     """
-    conv = frequencies**3 * 2. * np.pi**2 / (3 * constants.H0.si.value**2)
+    conv = frequencies**3 * 4. * np.pi**2 / (3 * constants.H0.si.value**2)
 
     weighted_energy = np.sum(weights, wave_energies, index=0)
 
-    return conv * weighted_energy
+    return Rate_norm * conv * weighted_energy

@@ -1,17 +1,28 @@
+import numpy as np
+
 import bilby
+import tqdm
+
 from .util import wave_energy, omega_gw
 from scipy.interpolate import interp1d
-
+from bilby.core.utils import infer_args_from_function_except_n_args
+from bilby.core.prior import Interped
 
 class PopulationOmegaGW(object):
-    def __init__(self, mass_model, redshift_model, spin_model = None, frequency_array=ARIANNA_PUT_REASONABLE_DEFAULT_HERE_PLS):
+    def __init__(self, mass_model, redshift_model, spin_model = None, frequency_array=None):
         
+        if frequency_array is not None:
+            self.frequency_array=frequency_array
+        else:
+            self.frequency_array=np.arange(10, 2048)
         self.mass_model = mass_model
         self.redshift_model = redshift_model
 
         self.m1_args = [arg for arg in self.mass_model.variable_names if 'beta' not in arg]
         self.q_args = [arg for arg in infer_args_from_function_except_n_args(self.mass_model.p_q) if 'dataset' not in arg]
         self.z_args = [arg for arg in self.redshift_model.variable_names if 'dataset' not in arg]
+        
+        self.calculate_weights()
         
     def set_pdraws_source(self):
         p_m1q = self.calculate_p_m1q(self.proposal_samples, {key: self.fiducial_parameters[key] for key in self.m1_args + self.q_args})
@@ -87,12 +98,14 @@ class PopulationOmegaGW(object):
         proposal_samples['mass_1_detector'] = proposal_samples['mass_1'] * (1 + proposal_samples['redshift'])
         self.proposal_samples = proposal_samples.copy()
 
-    def calculate_weights(self, Lambda):
+    def calculate_weights(self, Lambda=None):
         """
         Calculate weights from Lambda0 to Lambda
         """
-        ...
-        self.weights = ...
+        if Lambda is not None:
+            print('calculate weights... huh... cool...')
+        else:
+            self.weights = np.ones((len(self.proposal_samples)))
 
     def calculate_wave_energies(self, waveform_duration=10, sampling_frequency=2048, waveform_approximant='IMRPhenomD', waveform_reference_frequency=25, waveform_minimum_frequency=20):
         """
@@ -112,24 +125,23 @@ class PopulationOmegaGW(object):
 
         # These will need to be interpolated to match the requested frequencies
         waveform_frequencies = waveform_generator.frequency_array
-    
-	wave_energies = []
+        wave_energies = []
 
-        for i in self.fiducial_samples:
-        inj_sample = {}
-        # Generate the individual parameters dictionary for each injection
-        for k in fiducial_samples.keys():
-            try:
-                inj_sample[k] = fiducial_samples[k]['content'][i]
-            except:
-                inj_sample[k] = fiducial_samples[k][i]
+        for i in self.proposal_samples:
+            inj_sample = {}
+            # Generate the individual parameters dictionary for each injection
+            for k in self.proposal_samples.keys():
+                try:
+                    inj_sample[k] = fiducial_samples[k]['content'][i]
+                except:
+                    inj_sample[k] = fiducial_samples[k][i]
 
-	    wave_energies.append(interp1d(waveform_frequencies, wave_energy(waveform_generator, inj_sample))(self.frequencies))
+            wave_energies.append(interp1d(waveform_frequencies, wave_energy(waveform_generator, inj_sample))(self.frequency_array))
 
-	self.wave_energies = np.array(wave_energies)
-	
+        self.wave_energies = np.array(wave_energies)
 
-    def calculate_omega_gw(self, )
+
+    def calculate_omega_gw(self):
         """
         """
-        return omega_gw(self.frequencies, self.wave_energies, self.weights, T_observation=1):
+        self.omega_gw = omega_gw(self.frequency_array, self.wave_energies, self.weights, Rate_norm=1.e-3)
