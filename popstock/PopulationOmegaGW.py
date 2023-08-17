@@ -29,7 +29,7 @@ class PopulationOmegaGW(object):
         p_z = self.calculate_p_z(self.proposal_samples, {key: self.fiducial_parameters[key] for key in self.z_args})
         self.pdraws = p_m1q * p_z
         
-    def calculate_p_m1q(samples, mass_parameters):
+    def calculate_p_m1q(self, samples, mass_parameters):
         if hasattr(self.mass_model, 'n_below'):
             del self.mass_model.n_below
             del self.mass_model.n_above 
@@ -37,7 +37,7 @@ class PopulationOmegaGW(object):
         
         return p_m1q
 
-    def calculate_p_z(samples, redshift_parameters):
+    def calculate_p_z(self, samples, redshift_parameters):
         
         self.redshift_model.cached_dvc_dz = None
         p_z = self.redshift_model(samples, **redshift_parameters)
