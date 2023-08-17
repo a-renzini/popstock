@@ -127,15 +127,13 @@ class PopulationOmegaGW(object):
         waveform_frequencies = waveform_generator.frequency_array
         wave_energies = []
 
-        for i in self.proposal_samples:
+        for i in tqdm.tqdm(range(len(self.proposal_samples))):
             inj_sample = {}
             # Generate the individual parameters dictionary for each injection
             for k in self.proposal_samples.keys():
-                try:
-                    inj_sample[k] = fiducial_samples[k]['content'][i]
-                except:
-                    inj_sample[k] = fiducial_samples[k][i]
-
+                print(self.proposal_samples[k][i])
+                inj_sample[k] = self.proposal_samples[k][i]
+            
             wave_energies.append(interp1d(waveform_frequencies, wave_energy(waveform_generator, inj_sample))(self.frequency_array))
 
         self.wave_energies = np.array(wave_energies)
@@ -144,4 +142,5 @@ class PopulationOmegaGW(object):
     def calculate_omega_gw(self):
         """
         """
+        self.calculate_wave_energies()
         self.omega_gw = omega_gw(self.frequency_array, self.wave_energies, self.weights, Rate_norm=1.e-3)
