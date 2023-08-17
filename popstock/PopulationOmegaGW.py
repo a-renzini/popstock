@@ -130,10 +130,15 @@ class PopulationOmegaGW(object):
         for i in tqdm.tqdm(range(len(self.proposal_samples))):
             inj_sample = {}
             # Generate the individual parameters dictionary for each injection
+            print(self.proposal_samples.keys())
             for k in self.proposal_samples.keys():
-                print(self.proposal_samples[k][i])
                 inj_sample[k] = self.proposal_samples[k][i]
-            
+            inj_sample['phase']=2*np.pi*np.random.rand()
+            inj_sample['theta_jn']=np.pi*np.random.rand()
+            inj_sample['a_1']=0
+            inj_sample['a_2']=0
+            inj_sample['tilt_1']=0
+            inj_sample['tilt_2']=0
             wave_energies.append(interp1d(waveform_frequencies, wave_energy(waveform_generator, inj_sample))(self.frequency_array))
 
         self.wave_energies = np.array(wave_energies)
@@ -143,4 +148,4 @@ class PopulationOmegaGW(object):
         """
         """
         self.calculate_wave_energies()
-        self.omega_gw = omega_gw(self.frequency_array, self.wave_energies, self.weights, Rate_norm=1.e-3)
+        self.omega_gw = omega_gw(self.frequency_array, self.wave_energies, self.weights, Rate_norm=self.redshift_model.normalisation())
