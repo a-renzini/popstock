@@ -4,11 +4,88 @@ from scipy.interpolate import interp1d
 
 
 class PopulationOmegaGW(object):
-    def __init__(N_samples=5000, frequencies, ):
-        self.N_samples=N_samples
-        self.frequencies=frequencies
-        ...
-        self.fiducial_samples = '... N_samples samples from fiducial population'
+    def __init__(self, mass_model, redshift_model, spin_model = None, frequency_array=ARIANNA_PUT_REASONABLE_DEFAULT_HERE_PLS):
+        
+        self.mass_model = mass_model
+        self.redshift_model = redshift_model
+
+        self.m1_args = [arg for arg in self.mass_model.variable_names if 'beta' not in arg]
+        self.q_args = [arg for arg in infer_args_from_function_except_n_args(self.mass_model.p_q) if 'dataset' not in arg]
+        self.z_args = [arg for arg in self.redshift_model.variable_names if 'dataset' not in arg]
+        
+    def set_pdraws_source(self):
+        p_m1q = self.calculate_p_m1q(self.proposal_samples, {key: self.fiducial_parameters[key] for key in self.m1_args + self.q_args})
+        p_z = self.calculate_p_z(self.proposal_samples, {key: self.fiducial_parameters[key] for key in self.z_args})
+        self.pdraws = p_m1q * p_z
+        
+    def calculate_p_m1q(samples, mass_parameters):
+        if hasattr(self.mass_model, 'n_below'):
+            del self.mass_model.n_below
+            del self.mass_model.n_above 
+        p_m1q = self.mass_model(samples, **mass_parameters)
+        
+        return p_m1q
+
+    def calculate_p_z(samples, redshift_parameters):
+        
+        self.redshift_model.cached_dvc_dz = None
+        p_z = self.redshift_model(samples, **redshift_parameters)
+        self.redshift_model.cached_dvc_dz = None
+        
+        return p_z
+    
+    def draw_and_set_proposal_samples(self, fiducial_parameters, N_proposal_samples = 1e5):
+        
+        self.set_proposal_samples(fiducial_parameters, N_proposal_samples)
+        self.set_pdraws_source()        
+        
+    def draw_mass_proposal_samples(self, m1_grid, q_grid, population_params, N):
+        
+        print("Drawing m1 samples")
+        
+        m1_prob = self.mass_model.p_m1({'mass_1': m1_grid}, **{key: population_params[key] for key in self.m1_args})
+        pm1_interped = Interped(xx = m1_grid, yy = m1_prob)
+        mass_1_source_samples = pm1_interped.sample(N)
+        
+        print("Drawing mass ratio samples")
+        q_samples = []
+        for m1_sample in tqdm.tqdm(mass_1_source_samples):
+            if hasattr(self.mass_model, 'n_below'):
+                del self.mass_model.n_below
+                del self.mass_model.n_above
+            pqs = self.mass_model.p_q({'mass_1': np.array([m1_sample]), 'mass_ratio': q_grid}, **{key: population_params[key] for key in self.q_args})
+            pq_interped = Interped(xx = q_grid, yy = pqs)
+            q_samples.append(pq_interped.sample())
+        return {'mass_1': mass_1_source_samples, 'mass_ratio': np.array(q_samples)}
+    
+    def draw_redshift_proposal_samples(self, z_grid, population_params, N):
+        
+        print("Drawing redshift samples")
+        z_prob = self.redshift_model({'redshift': z_grid}, **{key: population_params[key] for key in self.z_args})
+        pz_interped = Interped(xx = z_grid, yy=z_prob)
+        z_samples = pz_interped.sample(N)
+        
+        return {'redshift': z_samples}
+    
+    def draw_source_proposal_samples(self, fiducial_parameters, N):
+        
+        proposal_samples = dict()
+        mass_samples = self.draw_mass_proposal_samples(self.mass_model.m1s, self.mass_model.qs, fiducial_parameters, N)
+        z_grid = np.logspace(np.log10(0.0001), np.log10(self.redshift_model.z_max), 10000)
+        z_samples = self.draw_redshift_proposal_samples(z_grid, fiducial_parameters, N)
+        
+        proposal_samples.update(mass_samples)
+        proposal_samples.update(z_samples)
+        
+        return proposal_samples
+    
+    def set_proposal_samples(self, fiducial_parameters, N):
+        
+        self.N_proposal_samples = N
+        self.fiducial_parameters = fiducial_parameters.copy()
+        proposal_samples = self.draw_source_proposal_samples(self.fiducial_parameters, self.N_proposal_samples)
+        proposal_samples['mass_1_detector'] = proposal_samples['mass_1'] * (1 + proposal_samples['redshift'])
+        self.proposal_samples = proposal_samples.copy()
 
     def calculate_weights(self, Lambda):
         """
