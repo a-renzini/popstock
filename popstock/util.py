@@ -35,7 +35,7 @@ def omega_gw(frequencies, wave_energies, weights,  Rate_norm):
     weights: np.array
         Array of weights per sample.
     Rate norm: float, optional
-        WHAT IS THIS I MUST KNOW.
+        **TODO**
 
     Returns
     =======
