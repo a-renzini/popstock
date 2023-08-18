@@ -22,8 +22,6 @@ class PopulationOmegaGW(object):
         self.q_args = [arg for arg in infer_args_from_function_except_n_args(self.mass_model.p_q) if 'dataset' not in arg]
         self.z_args = [arg for arg in self.redshift_model.variable_names if 'dataset' not in arg]
         
-        self.wave_energies_calculated = False
-        
     def set_pdraws_source(self):
         p_m1q = self.calculate_p_m1q(self.proposal_samples, {key: self.fiducial_parameters[key] for key in self.m1_args + self.q_args})
         p_z = self.calculate_p_z(self.proposal_samples, {key: self.fiducial_parameters[key] for key in self.z_args})
@@ -93,13 +91,11 @@ class PopulationOmegaGW(object):
     
     def set_proposal_samples(self, fiducial_parameters, N):
         
-        self.N_proposal_samples = int(N)
+        self.N_proposal_samples = N
         self.fiducial_parameters = fiducial_parameters.copy()
         proposal_samples = self.draw_source_proposal_samples(self.fiducial_parameters, self.N_proposal_samples)
         proposal_samples['mass_1_detector'] = proposal_samples['mass_1_source'] * (1 + proposal_samples['redshift'])
         self.proposal_samples = proposal_samples.copy()
-        
-        self.calculate_weights()
 
     def calculate_weights(self, Lambda=None):
         """
@@ -146,17 +142,10 @@ class PopulationOmegaGW(object):
             wave_energies.append(interp1d(waveform_frequencies, wave_energy(waveform_generator, inj_sample), fill_value=0, bounds_error=False, kind='cubic')(self.frequency_array))
 
         self.wave_energies = np.array(wave_energies)
-        self.wave_energies_calculated = True
 
-    def calculate_omega_gw(self, sampling_frequency=2048):
+
+    def calculate_omega_gw(self, **waveform_kwargs):
         """
         """
-        
-        if not self.wave_energies_calculated:
-            self.calculate_wave_energies(sampling_frequency=sampling_frequency)
-        
-        redshift_model_norm_in_Gpc3 = self.redshift_model.normalisation(self.fiducial_parameters)/1.e9
-        Rate_norm_in_Gpc3_per_seconds = self.fiducial_parameters['rate']/(60*60*24*365)
-        Rate_norm = redshift_model_norm_in_Gpc3 * Rate_norm_in_Gpc3_per_seconds
-        
-        self.omega_gw = omega_gw(self.frequency_array, self.wave_energies, self.weights, Rate_norm=Rate_norm)
+        self.calculate_wave_energies(**waveform_kwargs)
+        self.omega_gw = omega_gw(self.frequency_array, self.wave_energies, self.weights, Rate_norm=self.fiducial_parameters['rate'] * 10**-9 * (60*60*24*365)**-1 * self.redshift_model.normalisation(self.fiducial_parameters))
