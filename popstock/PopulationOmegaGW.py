@@ -106,7 +106,9 @@ class PopulationOmegaGW(object):
         Calculate weights from Lambda0 to Lambda
         """
         if Lambda is not None:
-            print('calculate weights... huh... cool...')
+            p_m1q = self.calculate_p_m1q(self.proposal_samples, {key: Lambda[key] for key in self.m1_args + self.q_args})
+            p_z = self.calculate_p_z(self.proposal_samples, {key: Lambda[key] for key in self.z_args})
+            self.weights = p_m1q * p_z / self.pdraws
         else:
             self.weights = np.ones(self.N_proposal_samples)
 
