@@ -22,7 +22,7 @@ class PopulationOmegaGW(object):
         self.q_args = [arg for arg in infer_args_from_function_except_n_args(self.mass_model.p_q) if 'dataset' not in arg]
         self.z_args = [arg for arg in self.redshift_model.variable_names if 'dataset' not in arg]
         
-        self.calculate_weights()
+        self.wave_energies_calculated = False
         
     def set_pdraws_source(self):
         p_m1q = self.calculate_p_m1q(self.proposal_samples, {key: self.fiducial_parameters[key] for key in self.m1_args + self.q_args})
@@ -46,7 +46,6 @@ class PopulationOmegaGW(object):
         return p_z
     
     def draw_and_set_proposal_samples(self, fiducial_parameters, N_proposal_samples = 1e5):
-        
         self.set_proposal_samples(fiducial_parameters, N_proposal_samples)
         self.set_pdraws_source()        
         
@@ -92,11 +91,13 @@ class PopulationOmegaGW(object):
     
     def set_proposal_samples(self, fiducial_parameters, N):
         
-        self.N_proposal_samples = N
+        self.N_proposal_samples = int(N)
         self.fiducial_parameters = fiducial_parameters.copy()
         proposal_samples = self.draw_source_proposal_samples(self.fiducial_parameters, self.N_proposal_samples)
         proposal_samples['mass_1_detector'] = proposal_samples['mass_1'] * (1 + proposal_samples['redshift'])
         self.proposal_samples = proposal_samples.copy()
+        
+        self.calculate_weights()
 
     def calculate_weights(self, Lambda=None):
         """
@@ -105,7 +106,7 @@ class PopulationOmegaGW(object):
         if Lambda is not None:
             print('calculate weights... huh... cool...')
         else:
-            self.weights = np.ones((len(self.proposal_samples)))
+            self.weights = np.ones((self.N_proposal_samples))
 
     def calculate_wave_energies(self, waveform_duration=10, sampling_frequency=2048, waveform_approximant='IMRPhenomD', waveform_reference_frequency=25, waveform_minimum_frequency=20):
         """
@@ -126,11 +127,9 @@ class PopulationOmegaGW(object):
         # These will need to be interpolated to match the requested frequencies
         waveform_frequencies = waveform_generator.frequency_array
         wave_energies = []
-
-        for i in tqdm.tqdm(range(len(self.proposal_samples))):
+        for i in tqdm.tqdm(range(self.N_proposal_samples)):
             inj_sample = {}
             # Generate the individual parameters dictionary for each injection
-            print(self.proposal_samples.keys())
             for k in self.proposal_samples.keys():
                 inj_sample[k] = self.proposal_samples[k][i]
             inj_sample['phase']=2*np.pi*np.random.rand()
@@ -142,10 +141,17 @@ class PopulationOmegaGW(object):
             wave_energies.append(interp1d(waveform_frequencies, wave_energy(waveform_generator, inj_sample))(self.frequency_array))
 
         self.wave_energies = np.array(wave_energies)
+        self.wave_energies_calculated = True
 
-
-    def calculate_omega_gw(self):
+    def calculate_omega_gw(self, sampling_frequency=2048):
         """
         """
-        self.calculate_wave_energies()
-        self.omega_gw = omega_gw(self.frequency_array, self.wave_energies, self.weights, Rate_norm=self.redshift_model.normalisation())
+        
+        if not self.wave_energies_calculated:
+            self.calculate_wave_energies(sampling_frequency=sampling_frequency)
+        
+        redshift_model_norm_in_Gpc3 = self.redshift_model.normalisation(self.fiducial_parameters)/1.e9
+        Rate_norm_in_Gpc3_per_seconds = self.fiducial_parameters['rate']/(60*60*24*365)
+        Rate_norm = redshift_model_norm_in_Gpc3 * Rate_norm_in_Gpc3_per_seconds
+        
+        self.omega_gw = omega_gw(self.frequency_array, self.wave_energies, self.weights, Rate_norm=Rate_norm)
