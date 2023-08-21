@@ -17,7 +17,6 @@ def wave_energy(waveform_generator, injection_parameters):
     =======
     The wave energy spectrum in a np.array.
     """
-    print(injection_parameters)
     polarizations = waveform_generator.frequency_domain_strain(injection_parameters)
     # Could make this into a FrequencySeries...
     return np.abs(polarizations['plus'])**2 + np.abs(polarizations['cross'])**2 
