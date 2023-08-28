@@ -117,7 +117,7 @@ class PopulationOmegaGW(object):
         else:
             self.weights = np.ones(self.N_proposal_samples)
 
-    def calculate_wave_energies(self, waveform_duration=10, sampling_frequency=4096, waveform_approximant='IMRPhenomD', waveform_reference_frequency=25, waveform_minimum_frequency=20):
+    def calculate_wave_energies(self, waveform_duration=10, sampling_frequency=4096, waveform_approximant='IMRPhenomD', waveform_reference_frequency=25, waveform_minimum_frequency=10, waveform_pn_phase_order=-1):
         """
         """
 
@@ -130,6 +130,7 @@ class PopulationOmegaGW(object):
                 "waveform_approximant": waveform_approximant,
                 "reference_frequency": waveform_reference_frequency,
                 "minimum_frequency": waveform_minimum_frequency,
+                "pn_phase_order": waveform_pn_phase_order,
             },
         )
 
@@ -143,27 +144,39 @@ class PopulationOmegaGW(object):
             for key in self.proposal_samples.keys():                
                 inj_sample[key] = self.proposal_samples[key][i]
                 
-            inj_sample['phase']=2*np.pi*np.random.rand()
-            inj_sample['theta_jn']=np.pi*np.random.rand()
-            inj_sample['a_1']=0
-            inj_sample['a_2']=0
-            inj_sample['tilt_1']=0
-            inj_sample['tilt_2']=0
-            wave_energies.append(interp1d(waveform_frequencies, wave_energy(waveform_generator, inj_sample), fill_value=0, bounds_error=False, kind='cubic')(self.frequency_array))
+            if not 'phase' in inj_sample:
+                inj_sample['phase']=2*np.pi*np.random.rand()
+            if not 'theta_jn' in inj_sample:
+                inj_sample['theta_jn']=np.pi*np.random.rand()
+            if not 'a_1' in inj_sample:
+                inj_sample['a_1']=0
+            if not 'a_2' in inj_sample:
+                inj_sample['a_2']=0
+            if not 'tilt_1' in inj_sample:
+                inj_sample['tilt_1']=0
+            if not 'tilt_2' in inj_sample:
+                inj_sample['tilt_2']=0
+            
+            use_approxed_waveform=False
+            if waveform_approximant=='PC_waveform':
+                use_approxed_waveform=True
+            
+            wave_energies.append(interp1d(waveform_frequencies, wave_energy(waveform_generator, inj_sample, use_approxed_waveform=use_approxed_waveform), fill_value=0, bounds_error=False, kind='cubic')(self.frequency_array))
 
         self.wave_energies = np.array(wave_energies)
         self.wave_energies_calculated = True
 
-    def calculate_omega_gw(self, Lambda=None, **kwargs):
+    def calculate_omega_gw(self, Lambda=None, Rate_norm=None, **kwargs):
         """
         """
         
         if not self.wave_energies_calculated:
             self.calculate_wave_energies(**kwargs)
         
-        redshift_model_norm_in_Gpc3 = self.redshift_model.normalisation(self.fiducial_parameters)/1.e9
-        Rate_norm_in_Gpc3_per_seconds = self.fiducial_parameters['rate']/(60*60*24*365)
-        Rate_norm = redshift_model_norm_in_Gpc3 * Rate_norm_in_Gpc3_per_seconds
+        if Rate_norm is None:
+            redshift_model_norm_in_Gpc3 = self.redshift_model.normalisation(self.fiducial_parameters)/1.e9
+            Rate_norm_in_Gpc3_per_seconds = self.fiducial_parameters['rate']/(60*60*24*365)
+            Rate_norm = redshift_model_norm_in_Gpc3 * Rate_norm_in_Gpc3_per_seconds
         
         self.calculate_weights(Lambda=Lambda)
 
