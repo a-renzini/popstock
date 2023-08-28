@@ -45,18 +45,19 @@ newpopTF2.calculate_omega_gw(waveform_approximant='TaylorF2')
 
 np.savez(f'omegagw_0_TF2_{tag}.npz', omega_gw=newpopTF2.omega_gw, freqs=newpopTF2.frequency_array, fiducial_samples=newpopTF2.proposal_samples, Lambda_0=Lambda_0)
 
-
 new_omegas={}
 new_omegasTF2={}
+
+new_omegas['Lambdas'] = []
+new_omegasTF2['Lambdas'] = []
+new_omegas['omega_gw'] = []
+new_omegasTF2['omega_gw'] = []
 
 result = bilby.core.result.read_in_result(filename='/home/jacob.golomb/o3b-population-data/analyses/PowerLawPeak/o1o2o3_mass_c_iid_mag_iid_tilt_powerlaw_redshift_result.json')
 lambda_samples = result.posterior.sample(N_trials).to_dict('list')
 
 print('Running trials...')
 for idx in tqdm.tqdm(range(N_trials)):
-    new_omegas[f'{idx}']={}
-    new_omegasTF2[f'{idx}']={}
-
     Lambda_new = {
             'alpha': lambda_samples['alpha'][idx], 
             'beta': lambda_samples['beta'][idx], 
@@ -71,18 +72,19 @@ for idx in tqdm.tqdm(range(N_trials)):
             'kappa': 5,
             'z_peak': 0.3*(0.5-np.random.rand())+1.9,
             }
-    new_omegas[f'{idx}']['Lambda']=Lambda_new
-    new_omegasTF2[f'{idx}']['Lambda']=Lambda_new
+    new_omegas['Lambdas'].append(Lambda_new)
+    new_omegasTF2['Lambdas'].append(Lambda_new)
 
     newpop.calculate_omega_gw(sampling_frequency=4096, Lambda=Lambda_new)
     
-    new_omegas[f'{idx}']['omega_gw']=newpop.omega_gw.tolist()
-    new_omegas[f'{idx}']['freqs']=newpop.frequency_array.tolist()
+    new_omegas['omega_gw'].append(newpop.omega_gw.tolist())
 
     newpopTF2.calculate_omega_gw(sampling_frequency=4096, Lambda=Lambda_new)
     
-    new_omegasTF2[f'{idx}']['omega_gw']=newpopTF2.omega_gw.tolist()
-    new_omegasTF2[f'{idx}']['freqs']=newpopTF2.frequency_array.tolist()
+    new_omegasTF2['omega_gw'].append(newpopTF2.omega_gw.tolist())
+
+new_omegasTF2['freqs']=newpopTF2.frequency_array.tolist()
+new_omegas['freqs']=newpop.frequency_array.tolist()
 
 omegas_dict = json.dumps(new_omegas)
 f = open(f"new_omegas_{tag}.json","w")
