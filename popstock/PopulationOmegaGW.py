@@ -3,6 +3,7 @@ import numpy as np
 import bilby
 import tqdm
 
+from .constants import z_to_dL_interpolant
 from .util import wave_energy, omega_gw
 from scipy.interpolate import interp1d
 from bilby.core.utils import infer_args_from_function_except_n_args
@@ -67,7 +68,7 @@ class PopulationOmegaGW(object):
             pqs = self.mass_model.p_q({'mass_1': np.array([m1_sample]), 'mass_ratio': q_grid}, **{key: population_params[key] for key in self.q_args})
             pq_interped = Interped(xx = q_grid, yy = pqs)
             q_samples.append(pq_interped.sample())
-        return {'mass_1_source': mass_1_source_samples, 'mass_ratio': np.array(q_samples)}
+        return {'mass_1_source': mass_1_source_samples, 'mass_ratio': np.array(q_samples), 'mass_2_source': mass_1_source_samples*np.array(q_samples)}
     
     def draw_redshift_proposal_samples(self, z_grid, population_params, N):
         
@@ -76,7 +77,7 @@ class PopulationOmegaGW(object):
         pz_interped = Interped(xx = z_grid, yy=z_prob)
         z_samples = pz_interped.sample(N)
         
-        return {'redshift': z_samples}
+        return {'redshift': z_samples, 'luminosity_distance': z_to_dL_interpolant(z_samples)}
     
     def draw_source_proposal_samples(self, fiducial_parameters, N):
         

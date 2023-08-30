@@ -67,7 +67,6 @@ def waveform_approx_amplitude(injection_parameters, frequencies):
     dL_in_m = injection_parameters['luminosity_distance']*kpc.value*1.e3
     const = (G*total_mass_in_kg*(1+injection_parameters['redshift']))**(5/6) * f_merg**(-7/6)/(dL_in_m)/np.pi**(2/3) * (5*sym_mass_ratio/24)**(1/2) / light_speed**(3/2)
     return const * wave_amplitude
-
     
     
 def omega_gw(frequencies, wave_energies, weights,  Rate_norm):
