@@ -173,12 +173,16 @@ class PopulationOmegaGW(object):
         
         if not self.wave_energies_calculated:
             self.calculate_wave_energies(**kwargs)
+
+        self.calculate_weights(Lambda=Lambda)    
         
         if Rate_norm is None:
-            redshift_model_norm_in_Gpc3 = self.redshift_model.normalisation(self.fiducial_parameters)/1.e9
-            Rate_norm_in_Gpc3_per_seconds = self.fiducial_parameters['rate']/(60*60*24*365)
+            
+            if Lambda is None:
+                Lambda = self.fiducial_parameters
+            
+            redshift_model_norm_in_Gpc3 = self.redshift_model.normalisation(Lambda)/1.e9
+            Rate_norm_in_Gpc3_per_seconds = Lambda['rate']/(60*60*24*365)
             Rate_norm = redshift_model_norm_in_Gpc3 * Rate_norm_in_Gpc3_per_seconds
-        
-        self.calculate_weights(Lambda=Lambda)
 
         self.omega_gw = omega_gw(self.frequency_array, self.wave_energies, self.weights, Rate_norm=Rate_norm)
