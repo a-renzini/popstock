@@ -44,7 +44,7 @@ Lambda_0 =  {'alpha': 2.5, 'beta': 1, 'delta_m': 3, 'lam': 0.04, 'mmax': 100, 'm
 mass_obj = SinglePeakSmoothedMassDistribution()
 redshift_obj = MadauDickinsonRedshift(z_max=10)
 
-freqs = np.arange(1, 2048, 0.5)
+freqs = np.arange(10, 2000, 5)
 newpop = PopulationOmegaGW(mass_model=mass_obj, redshift_model=redshift_obj, frequency_array=freqs)
 
 newpop.draw_and_set_proposal_samples(Lambda_0, N_proposal_samples=N_proposal_samples)
