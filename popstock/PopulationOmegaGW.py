@@ -6,6 +6,7 @@ import tqdm
 from .constants import z_to_dL_interpolant
 from .util import wave_energy, omega_gw
 from scipy.interpolate import interp1d
+
 from bilby.core.utils import infer_args_from_function_except_n_args
 from bilby.core.prior import Interped
 from gwpopulation.utils import xp
@@ -34,6 +35,7 @@ class PopulationOmegaGW(object):
             self.frequency_array=frequency_array
         else:
             self.frequency_array=np.arange(10, 2048)
+        self.frequency_array_xp=xp.asarray(self.frequency_array)
 
         self.models = {key.split("_model")[0]: models[key] for key in models}
 
@@ -95,10 +97,11 @@ class PopulationOmegaGW(object):
         return p_masses * p_z * p_spins
 
     def set_pdraws_source(self):
+        #why this popping?
         self.pdraws = self.proposal_samples.pop("pdraw")
 
-    def calculate_pdraws(self):
-        self.proposal_samples['pdraw'] = xp.array(self.calculate_probabilities(self.proposal_samples, self.fiducial_parameters))
+    def calculate_pdraws(self, proposal_samples):
+        proposal_samples['pdraw'] = xp.array(self.calculate_probabilities(proposal_samples, self.fiducial_parameters))
         
     def calculate_p_masses(self, samples, mass_parameters):
         if hasattr(self.models['mass'], 'n_below'):
@@ -134,9 +137,9 @@ class PopulationOmegaGW(object):
         if not fiducial_parameters:
             raise ValueError("No valid parameters passed to set proposal samples.")
         self.fiducial_parameters = fiducial_parameters.copy()
-        proposal_samples = self.draw_source_proposal_samples(self.fiducial_parameters, self.N_proposal_samples)
+        proposal_samples = self.draw_source_proposal_samples(self.fiducial_parameters, N_proposal_samples)
         
-        self.set_proposal_samples(proprosal_samples=proposal_samples)
+        self.set_proposal_samples(proposal_samples=proposal_samples)
         
     def draw_mass_proposal_samples(self, population_params, N, grids = MASS_GRIDS):
         
@@ -152,7 +155,7 @@ class PopulationOmegaGW(object):
             if hasattr(self.models['mass'], 'n_below'):
                 del self.models['mass'].n_below
                 del self.models['mass'].n_above
-            probs = self.models[self.other_mass_coord]({'mass_1': np.array([m1_sample]), self.other_mass_coord: grids[self.other_mass_coord]}, **{key: population_params[key] for key in self.model_args[self.other_mass_coord]})
+            probs = self.models[self.other_mass_coord]({'mass_1': xp.array([m1_sample]), self.other_mass_coord: grids[self.other_mass_coord]}, **{key: population_params[key] for key in self.model_args[self.other_mass_coord]})
             mass_interped = Interped(xx = grids[self.other_mass_coord], yy = probs)
             other_mass_samples.append(mass_interped.sample())
         return {'mass_1_source': mass_1_source_samples, self.other_mass_coord: xp.array(other_mass_samples)}
@@ -161,6 +164,7 @@ class PopulationOmegaGW(object):
         
         print("Drawing redshift samples")
         z_prob = self.models['redshift']({'redshift': z_grid}, **{key: population_params[key] for key in self.model_args['redshift']})
+        print({key: population_params[key] for key in self.model_args['redshift']})
         pz_interped = Interped(xx = z_grid, yy=z_prob)
         z_samples = pz_interped.sample(N)
         
@@ -197,13 +201,20 @@ class PopulationOmegaGW(object):
         proposal_samples.update(mass_samples)
         proposal_samples.update(z_samples)
         proposal_samples.update(spin_samples)
-        proposal_samples.update(self.calculate_pdraws())
+        self.calculate_pdraws(proposal_samples)
         
         return proposal_samples
     
     def set_proposal_samples(self, proposal_samples=None):
         
+        keys = proposal_samples.keys()
+        for key in proposal_samples:
+            if type(proposal_samples[key]) is list:
+                proposal_samples[key] = xp.array(proposal_samples[key])
+        
         proposal_samples['mass_1_detector'] = proposal_samples['mass_1_source'] * (1 + proposal_samples['redshift'])
+        proposal_samples['mass_2_source'] = proposal_samples['mass_1_source'] * proposal_samples['mass_ratio']
+        proposal_samples['mass_2_detector'] = proposal_samples['mass_2_source'] * (1 + proposal_samples['redshift'])
         self.proposal_samples = proposal_samples.copy()
         self.N_proposal_samples = len(proposal_samples['pdraw'])
 
@@ -248,8 +259,8 @@ class PopulationOmegaGW(object):
             if not 'phase' in inj_sample:
                 inj_sample['phase']=2*np.pi*np.random.rand()
             if not 'theta_jn' in inj_sample:
-                inj_sample['theta_jn']=np.pi*np.random.rand()
-            """
+                cos_inc = np.random.rand()*2.-1.
+                inj_sample['theta_jn']=np.arccos(cos_inc)
             if not 'a_1' in inj_sample:
                 inj_sample['a_1']=0
             if not 'a_2' in inj_sample:
@@ -258,14 +269,20 @@ class PopulationOmegaGW(object):
                 inj_sample['tilt_1']=0
             if not 'tilt_2' in inj_sample:
                 inj_sample['tilt_2']=0
-            """
             use_approxed_waveform=False
             if waveform_approximant=='PC_waveform':
                 use_approxed_waveform=True
-            
-            wave_energies.append(interp1d(waveform_frequencies, wave_energy(waveform_generator, inj_sample, use_approxed_waveform=use_approxed_waveform), fill_value=0, bounds_error=False, kind='cubic')(self.frequency_array))
+            '''
+            waveform_frequencies = xp.asarray(waveform_frequencies)
+            wave_en = xp.asarray(wave_energy(waveform_generator, inj_sample, use_approxed_waveform=use_approxed_waveform))
+            wave_energies.append(xp.interp(self.frequency_array, waveform_frequencies, wave_en) )
+            '''
+            wave_en = wave_energy(waveform_generator, inj_sample, use_approxed_waveform=use_approxed_waveform)
+            wave_energies.append(np.interp(self.frequency_array, waveform_frequencies, wave_en) )
+            #could also do cubic interp but takes a bit longer
+            #wave_energies.append(interp1d(waveform_frequencies, wave_en, fill_value=0, bounds_error=False, kind='cubic')(frequency_array))
 
-        self.wave_energies = np.array(wave_energies)
+        self.wave_energies = xp.array(wave_energies)
         self.wave_energies_calculated = True
 
     def calculate_omega_gw(self, Lambda=None, Rate_norm=None, **kwargs):
@@ -282,8 +299,10 @@ class PopulationOmegaGW(object):
             if Lambda is None:
                 Lambda = self.fiducial_parameters
             
-            redshift_model_norm_in_Gpc3 = self.redshift_model.normalisation(Lambda)/1.e9
+            redshift_model_norm_in_Gpc3 = self.models['redshift'].normalisation(Lambda)/1.e9
             Rate_norm_in_Gpc3_per_seconds = Lambda['rate']/(60*60*24*365)
             Rate_norm = redshift_model_norm_in_Gpc3 * Rate_norm_in_Gpc3_per_seconds
 
-        self.omega_gw = omega_gw(self.frequency_array, self.wave_energies, self.weights, Rate_norm=Rate_norm)
+        frequencies = self.frequency_array_xp
+        self.omega_gw = omega_gw(frequencies, self.wave_energies, self.weights, Rate_norm=Rate_norm)
+
