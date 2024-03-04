@@ -12,7 +12,7 @@
 
 stages:
   - initial
-  - test
+  # - test
   - documentation
   - deploy
 
@@ -132,7 +132,7 @@ documentation:
 pages:
   stage: deploy
   dependencies:
-  # - python-3.8
+    - basic-3.8
     - documentation
   script:
     - mkdir public/
@@ -144,3 +144,4 @@ pages:
     expire_in: 30 days
   only:
   - master
+
