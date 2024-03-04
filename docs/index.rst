@@ -12,11 +12,11 @@ popstock documentation
 
 .. raw:: html
 
-   <a href="about.html"><button style="background-color:#307FC1;border-color:#307FC1;color:white;width: 200.0px; height: 100.0px;border-radius: 8px;margin-bottom: 10px;margin-left: 10px">More about pygwb</button></a>
-   <a href="installation.html"><button style="background-color:#307FC1;color:white;border-color:#307FC1;width: 200.0px; height: 100.0px;border-radius: 8px;margin-bottom: 10px;margin-left: 10px">Installing pygwb</button></a>
+   <a href="about.html"><button style="background-color:#307FC1;border-color:#307FC1;color:white;width: 200.0px; height: 100.0px;border-radius: 8px;margin-bottom: 10px;margin-left: 10px">More about popstock</button></a>
+   <a href="installation.html"><button style="background-color:#307FC1;color:white;border-color:#307FC1;width: 200.0px; height: 100.0px;border-radius: 8px;margin-bottom: 10px;margin-left: 10px">Installing popstock</button></a>
     <a href="api.html"><button style="background-color:#307FC1;color:white;border-color:#307FC1;width: 200.0px; height: 100.0px;border-radius: 8px;margin-bottom: 10px;margin-left: 10px">Module API</button></a>
-   <a href="citing.html"><button style="background-color:#307FC1;color:white;border-color:#307FC1;width: 200.0px; height: 100.0px;border-radius: 8px;margin-bottom: 10px;margin-left: 10px">Contributing to pygwb</button></a>
-   <a href="contributing.html"><button style="background-color:#307FC1;color:white;border-color:#307FC1;width: 200.0px; height: 100.0px;border-radius: 8px;margin-bottom: 10px;margin-left: 10px">Contributing to pygwb</button></a>
+   <a href="citing.html"><button style="background-color:#307FC1;color:white;border-color:#307FC1;width: 200.0px; height: 100.0px;border-radius: 8px;margin-bottom: 10px;margin-left: 10px">Citing popstock</button></a>
+   <a href="contributing.html"><button style="background-color:#307FC1;color:white;border-color:#307FC1;width: 200.0px; height: 100.0px;border-radius: 8px;margin-bottom: 10px;margin-left: 10px">Contributing to popstock</button></a>
    
 .. toctree::
    :maxdepth: 1
