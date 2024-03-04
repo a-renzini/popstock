@@ -23,22 +23,21 @@ import sys
 
 sys.path.append(os.getcwd())
 
-from popstock.PopulationOmegaGW import PopulationOmegaGW
+import argparse
+import json
+import os
+from pathlib import Path
+
+import bilby
+import numpy as np
+import tqdm
+from bilby.core.prior import Interped
+from bilby.core.utils import infer_args_from_function_except_n_args
 from gwpopulation.models.mass import SinglePeakSmoothedMassDistribution
 from gwpopulation.models.redshift import MadauDickinsonRedshift
 from gwpopulation.utils import xp
 
-import argparse
-import numpy as np
-import bilby
-import tqdm
-import json
-
-import os
-from pathlib import Path
-
-from bilby.core.prior import Interped
-from bilby.core.utils import infer_args_from_function_except_n_args
+from popstock.PopulationOmegaGW import PopulationOmegaGW
 
 """
 ***

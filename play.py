@@ -1,15 +1,15 @@
-from popstock.PopulationOmegaGW import PopulationOmegaGW
+import json
+
+import bilby
+import matplotlib.pyplot as plt
+import numpy as np
+import tqdm
+from bilby.core.prior import Interped
+from bilby.core.utils import infer_args_from_function_except_n_args
 from gwpopulation.models.mass import SinglePeakSmoothedMassDistribution
 from gwpopulation.models.redshift import MadauDickinsonRedshift
 
-import numpy as np
-import bilby
-import tqdm
-import json
-
-from bilby.core.prior import Interped
-import matplotlib.pyplot as plt
-from bilby.core.utils import infer_args_from_function_except_n_args
+from popstock.PopulationOmegaGW import PopulationOmegaGW
 
 """
 ***

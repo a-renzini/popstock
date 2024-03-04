@@ -1,22 +1,22 @@
 #!/bin/env python
 import sys
+
 sys.path.append("/home/arianna.renzini/PROJECTS/popstock")
 
-from popstock.PopulationOmegaGW import PopulationOmegaGW
-from gwpopulation.models.mass import SinglePeakSmoothedMassDistribution
-from gwpopulation.models.redshift import MadauDickinsonRedshift
-
-import argparse 
-import numpy as np
-import bilby
-import tqdm
+import argparse
 import json
-
 import os
 from pathlib import Path
 
+import bilby
+import numpy as np
+import tqdm
 from bilby.core.prior import Interped
 from bilby.core.utils import infer_args_from_function_except_n_args
+from gwpopulation.models.mass import SinglePeakSmoothedMassDistribution
+from gwpopulation.models.redshift import MadauDickinsonRedshift
+
+from popstock.PopulationOmegaGW import PopulationOmegaGW
 
 """
 ***
