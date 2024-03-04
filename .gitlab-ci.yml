@@ -1,0 +1,146 @@
+# This script is an edited version of the example found at
+# https://git.ligo.org/lscsoft/example-ci-project/blob/python/.gitlab-ci.yml
+# Each 0th-indendation level is a job that will be run within GitLab CI
+# The only exception are a short list of reserved keywords
+#
+# https://docs.gitlab.com/ee/ci/yaml/#gitlab-ci-yml
+
+# stages is a reserved keyword that defines job dependencies and
+# parallelization. each stage runs in parallel but must complete
+# before the next stage begins
+# This file was copied from bilby_pipe
+
+stages:
+  - initial
+  - test
+  - documentation
+  - deploy
+
+.basic-python: &basic-python
+  stage: initial
+  image: python
+  before_script:
+    - pip install --upgrade pip
+  script:
+    - pip install --ignore-installed .
+    - cd ..
+    - python -c "import popstock"
+    - python -c "import popstock.PopulationOmegaGW"
+    - python -c "import popstock.constants"
+    - python -c "import popstock.util"
+    - for script in $(pip show -f popstock | grep "bin\/" | xargs -I {} basename {}); do
+          ${script} --help;
+      done
+
+basic-3.8:
+  <<: *basic-python
+  image: python:3.8
+
+basic-3.9:
+  <<: *basic-python
+  image: python:3.9
+
+basic-3.10:
+  <<: *basic-python
+  image: python:3.10
+
+
+.precommits-python: &precommits-python
+  stage: initial
+  image: python
+  script:
+    - pip install --upgrade pip
+    - pip install .
+    - pip install pre-commit
+
+    # Run precommits (black, flake8, spellcheck, isort, no merge conflicts, etc)
+    - pre-commit run --files popstock/*.py --verbose --show-diff-on-failure
+      #- pre-commit run --files test/*.py --verbose --show-diff-on-failure
+      #- pre-commit run --files tutorials/*.py --verbose --show-diff-on-failure
+    - pre-commit run --files *.py --verbose --show-diff-on-failure
+
+precommits-py3.8:
+  <<: *precommits-python
+  image: python:3.8
+
+
+  #.test-python: &test-python
+  #  stage: test
+  #  image: python
+  #  before_script:
+  #    - pip install --upgrade pip setuptools
+  #    - pip install pytest pytest-cov coverage-badge
+  #  script:
+  #    - pip install .
+  #    - pytest --cov=popstock --cov-config=.coveragerc
+
+  #python-3.8:
+  #  <<: *test-python
+  #  image: python:3.8
+  #  after_script:
+  #    - coverage html
+  #    - coverage xml
+  #  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+  #  artifacts:
+  #    reports:
+  #      coverage_report:
+  #        coverage_format: cobertura
+  #        path: coverage.xml
+  #    paths:
+  #      - htmlcov/
+  #    expire_in: 30 days
+  #
+  #python-3.9:
+  #  <<: *test-python
+  #  image: python:3.9
+  #
+  #python-3.10:
+  #  <<: *test-python
+  #  image: python:3.10
+
+  #workflow:
+  #  stage: test
+  #  image: python:3.10
+  #  before_script:
+  #    - pip install --upgrade pip setuptools
+  #  script:
+  #    - pip install .
+  #    - mkdir population_result
+  #    - population_O3.py --
+
+documentation:
+  stage: documentation
+  image: python:3.8
+  before_script:
+    - apt-get -yqq update
+    - apt-get -yqq install pandoc
+    - pip install --upgrade pip setuptools
+    - pip install ipykernel ipython==8.12.0 jupyter
+    - pip install sphinx numpydoc nbsphinx sphinx_rtd_theme sphinx-tabs autodoc ipython-genutils
+    - pip install .
+
+  script:
+    - cd docs
+    - make clean
+    - make html
+    - cd -
+
+  artifacts:
+    paths:
+      - docs/_build
+
+pages:
+  stage: deploy
+  dependencies:
+    - python-3.8
+    - documentation
+  script:
+    - mkdir public/
+      #- mv htmlcov/ public/
+    - mv docs/_build/html/* public/
+  artifacts:
+    paths:
+      - public
+    expire_in: 30 days
+  only:
+  - master
