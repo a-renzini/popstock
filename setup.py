@@ -13,8 +13,8 @@ def readfile(filename):
 
 
 setup(
-    name="pygwb",
-    description="A lightweight package for quick evaluation of the stochastic GW energy density Omega_GW emitted by a population of binary black holes and/or neutron stars.",
+    name="popstock",
+    description="A lightweight package for fast evaluation of the stochastic GW energy density Omega_GW emitted by a population of binary black holes and/or neutron stars.",
     url="https://git.ligo.org/arianna.renzini/popstock",
     author="Arianna Renzini, Jacob Golomb",
     author_email="aria.renzini@gmail.com",
