@@ -231,9 +231,27 @@ class PopulationOmegaGW(object):
             if type(proposal_samples[key]) is list:
                 proposal_samples[key] = xp.array(proposal_samples[key])
         
-        proposal_samples['mass_1_detector'] = proposal_samples['mass_1_source'] * (1 + proposal_samples['redshift'])
-        proposal_samples['mass_2_source'] = proposal_samples['mass_1_source'] * proposal_samples['mass_ratio']
-        proposal_samples['mass_2_detector'] = proposal_samples['mass_2_source'] * (1 + proposal_samples['redshift'])
+        # fix mass samples
+        if 'mass_1' in keys:
+            proposal_samples['mass_1_detector'] = proposal_samples['mass_1']
+            proposal_samples['mass_1_source'] = proposal_samples['mass_1_detector'] / (1 + proposal_samples['redshift'])
+            if 'mass_2' in keys:
+                proposal_samples['mass_2_detector'] = proposal_samples['mass_2']
+            elif 'mass_ratio' in keys:
+                proposal_samples['mass_2_detector'] = proposal_samples['mass_1']*proposal_samples['mass_ratio']
+            else:
+                raise ValueError('Missing mass parameter in proposal sample set.')
+            proposal_samples['mass_2_source'] = proposal_samples['mass_2_detector'] / (1 + proposal_samples['redshift'])
+        elif 'mass_1_source' in keys:
+            proposal_samples['mass_1_detector'] = proposal_samples['mass_1_source'] * (1 + proposal_samples['redshift'])
+            if 'mass_ratio' in keys:
+                proposal_samples['mass_2_source'] = proposal_samples['mass_1_source'] * proposal_samples['mass_ratio']
+            try: 
+                proposal_samples['mass_2_detector'] = proposal_samples['mass_2_source'] * (1 + proposal_samples['redshift'])
+            except ValueError:
+                raise ValueError('Missing mass parameter in proposal sample set.')
+        else:
+            raise ValueError('Missing mass parameter in proposal sample set.')
         self.proposal_samples = proposal_samples.copy()
         self.N_proposal_samples = len(proposal_samples['pdraw'])
 
@@ -246,6 +264,7 @@ class PopulationOmegaGW(object):
         if Lambda is not None:
             probabilities = self.calculate_probabilities(self.proposal_samples, Lambda)
             self.weights = (probabilities / self.pdraws)
+            self.weights[np.where(probabilities==0.0)]=0.0
         else:
             self.weights = np.ones(self.N_proposal_samples)
 
