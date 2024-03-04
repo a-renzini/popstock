@@ -22,6 +22,7 @@ from gwpopulation.utils import xp
 
 from .constants import H0
 
+
 def wave_energy(waveform_generator, injection_parameters, use_approxed_waveform=False):
     """
     Compute the GW energy for a given waveform and set of parameters.
@@ -56,7 +57,7 @@ def waveform_approx_amplitude(injection_parameters, frequencies):
     """Ajith+, Sammut+"""
     
     # I-M-R frequencies
-    from .constants import m_sun, mass_to_seconds_conv, G, light_speed
+    from .constants import G, light_speed, m_sun, mass_to_seconds_conv
     total_mass_in_kg = float((injection_parameters['mass_1_source']+injection_parameters['mass_2_source']) * m_sun)
     total_mass_scaled = float(total_mass_in_kg * mass_to_seconds_conv)
     sym_mass_ratio = float((injection_parameters['mass_1_source']*injection_parameters['mass_2_source'])/(injection_parameters['mass_1_source']+injection_parameters['mass_2_source'])**2)

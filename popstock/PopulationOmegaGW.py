@@ -17,18 +17,16 @@
 #
 # This file is part of the popstock package.
 
-import numpy as np
-
 import bilby
+import numpy as np
 import tqdm
-
-from .constants import z_to_dL_interpolant
-from .util import wave_energy, omega_gw
+from bilby.core.prior import Interped
+from bilby.core.utils import infer_args_from_function_except_n_args
+from gwpopulation.utils import xp
 from scipy.interpolate import interp1d
 
-from bilby.core.utils import infer_args_from_function_except_n_args
-from bilby.core.prior import Interped
-from gwpopulation.utils import xp
+from .constants import z_to_dL_interpolant
+from .util import omega_gw, wave_energy
 
 REQUIRED_MODELS = ['mass', 'redshift']
 SPIN_MODELS = ['a_1', 'a_2',  'cos_tilt_1', 'cos_tilt_2', 'chi_eff', 'chi_p']
