@@ -92,3 +92,20 @@ def omega_gw(frequencies, wave_energies, weights,  Rate_norm):
     weighted_energy = np.sum(weights[:, None] * wave_energies, axis=0) / len(weights)
 
     return Rate_norm * conv * weighted_energy
+
+def icdf_powerlaw(unit_value, alpha, low, high):
+    oneplusalpha = 1 + alpha
+    a = low**oneplusalpha
+    b = high**oneplusalpha - a
+    return (a + b * unit_value)**(1/oneplusalpha)
+
+
+def sample_powerlaw(spectral_index, low, high, N):
+    """
+    This is the actual spectral index x^alpha, not the negative of the spectral index
+    """
+    unit_samples = np.random.random(N)
+    return icdf_powerlaw(unit_samples, alpha = spectral_index, low = low, high = high)
+
+def pdf_powerlaw(value, alpha, low, high):
+    return (-alpha - 1) * (low / value)**-alpha / (low * (1 - (low/high)**(-alpha-1)))
