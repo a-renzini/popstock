@@ -89,12 +89,11 @@ pages:
     - documentation
   script:
     - mkdir public/
-      #- mv htmlcov/ public/
     - mv docs/_build/html/* public/
   artifacts:
     paths:
       - public
     expire_in: 30 days
   only:
-  - master
+  - main
 
