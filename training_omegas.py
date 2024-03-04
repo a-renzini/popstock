@@ -53,14 +53,6 @@ the fiducial distribution to the provided distributions.
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
-    "-ps",
-    "--parameter_set",
-    help="Parameter sets to generate training data for.",
-    action="store",
-    type=str,
-    default=10000,
-)
-parser.add_argument(
     "-rd",
     "--run_directory",
     help="Run directory.",
