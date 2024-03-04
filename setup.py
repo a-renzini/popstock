@@ -22,7 +22,7 @@ setup(
     packages=["popstock"],
     package_dir={"popstock": "popstock"},
     scripts=[
-        "population_O3.py",
+        "scripts/population_O3",
     ],
     install_requires=[
         "numpy",
