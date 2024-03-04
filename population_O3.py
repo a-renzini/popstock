@@ -47,12 +47,13 @@ parser.add_argument('-nt', '--number_trials',help="number of population trials."
 parser.add_argument('-wf', '--waveform_approximant',help="Wavefrom approximant. Default is IMRPhenomD.",action="store", type=str, default='IMRPhenomD')
 parser.add_argument('-rd', '--run_directory',help="Run directory.",action="store", type=str, default='./')
 parser.add_argument('-sm', '--samples',help="Samples to use.",action="store", type=str, default=None)
+parser.add_argument('-fr', '--frequencies',help="txt file with frequencies to use for the spectrum calculation.",action="store", type=str, default=None)
 args = parser.parse_args()
 
 N_proposal_samples=args.number_samples
 N_trials=args.number_trials
 wave_approx=args.waveform_approximant 
-tag=f'{wave_approx}_{N_proposal_samples}_samples_{N_trials}_trials_thetajnfix'
+tag=f'{wave_approx}_{N_proposal_samples}_samples_{N_trials}_trials'
 rundir=Path(args.run_directory)
 
 """
@@ -66,7 +67,13 @@ models = {
         'mass_model' : mass_obj,
         'redshift_model' : redshift_obj,
         }
-freqs = np.arange(10, 2000, 5)
+if args.frequencies is None:
+    freqs = np.arange(10, 2000, 2.5)
+else:
+    try:
+        freqs = np.loadtxt(args.frequencies)
+    except ValueError:
+        raise ValueError(f"{args.frequencies} is not a txt file.")
 
 newpop = PopulationOmegaGW(models=models, frequency_array=freqs)
 
@@ -118,9 +125,9 @@ for idx in tqdm.tqdm(range(N_trials)):
             'mpp': lambda_samples['mpp'][idx],
             'sigpp': lambda_samples['sigpp'][idx],
             'rate': lambda_samples['rate'][idx],
-            'gamma': 3.61, # lambda_samples['lamb'][idx],
-            'kappa': 3.83,
-            'z_peak': 1.04, #2.0, #0.3*(0.5-np.random.rand())+1.9,
+            'gamma': 2.7, # lambda_samples['lamb'][idx],
+            'kappa': 5.6, #3.83,
+            'z_peak': 1.9, #0.3*(0.5-np.random.rand())+1.9,
             }
     new_omegas['Lambdas'].append(Lambda_new)
 
