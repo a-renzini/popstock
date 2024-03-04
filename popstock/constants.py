@@ -17,10 +17,11 @@
 #
 # This file is part of the popstock package.
 
-from astropy.cosmology import Planck15 as cosmo
+from astropy.cosmology import Planck18 as cosmo
+from astropy.constants import c
 
 H0 = cosmo.H(0)
-light_speed = 2.998e8
+light_speed = c.value
 m_sun = 1.99e30 #kg
 G = 6.67e-11 #N*m^2/kg^2
 mass_to_seconds_conv = G/light_speed**3
