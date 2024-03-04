@@ -20,7 +20,7 @@
 import numpy as np
 from gwpopulation.utils import xp
 
-from .constants import H0
+from popstock.constants import H0
 
 
 def wave_energy(waveform_generator, injection_parameters, use_approxed_waveform=False):
