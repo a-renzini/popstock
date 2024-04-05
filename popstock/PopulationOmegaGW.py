@@ -17,6 +17,8 @@
 #
 # This file is part of the popstock package.
 
+import multiprocessing
+
 import bilby
 import numpy as np
 import tqdm
@@ -27,8 +29,6 @@ from scipy.interpolate import interp1d
 
 from popstock.constants import z_to_dL_interpolant
 from popstock.util import omega_gw, pdf_powerlaw, sample_powerlaw, wave_energy
-
-import multiprocessing
 
 REQUIRED_MODELS = ['mass', 'redshift']
 SPIN_MODELS = ['a_1', 'a_2',  'cos_tilt_1', 'cos_tilt_2', 'chi_eff', 'chi_p']
@@ -333,7 +333,7 @@ class PopulationOmegaGW(object):
         """
         """
 
-        # setting up internal varibles for wf generation...
+        # setting up internal variables for wf generation...
         self.waveform_generator = bilby.gw.WaveformGenerator(
             duration=waveform_duration, sampling_frequency=sampling_frequency,
             frequency_domain_source_model=bilby.gw.source.lal_binary_black_hole,
