@@ -28,6 +28,8 @@ from scipy.interpolate import interp1d
 from popstock.constants import z_to_dL_interpolant
 from popstock.util import omega_gw, pdf_powerlaw, sample_powerlaw, wave_energy
 
+import multiprocessing
+
 REQUIRED_MODELS = ['mass', 'redshift']
 SPIN_MODELS = ['a_1', 'a_2',  'cos_tilt_1', 'cos_tilt_2', 'chi_eff', 'chi_p']
 
@@ -170,16 +172,21 @@ class PopulationOmegaGW(object):
         iteration = 0
         n_try = 100*N
 
+        try:
+            alpha_mass = population_params['alpha']
+        except KeyError:
+            alpha_mass = population_params['alpha_1']
+
         while len(samples[self.mass_coordinates[0]]) < N:
             initial_samples = dict()
-            initial_samples['mass_1'] = np.array(sample_powerlaw(-1*population_params['alpha'], 
+            initial_samples['mass_1'] = np.array(sample_powerlaw(-1*alpha_mass, 
                                         low = population_params['mmin'],
                                         high = population_params['mmax'],
                                         N = n_try,
                                         ) )
             
             initial_samples['p_draw']= pdf_powerlaw(initial_samples["mass_1"],  
-                                                     -1*population_params['alpha'], 
+                                                     -1*alpha_mass, 
                                                     low = population_params['mmin'],
                                                     high = population_params['mmax'],
                                                 )
@@ -322,12 +329,12 @@ class PopulationOmegaGW(object):
         else:
             self.weights = np.ones(self.N_proposal_samples)
 
-    def calculate_wave_energies(self, waveform_duration=10, sampling_frequency=4096, waveform_approximant='IMRPhenomD', waveform_reference_frequency=25, waveform_minimum_frequency=10, waveform_pn_phase_order=-1):
+    def calculate_wave_energies(self, waveform_duration=10, sampling_frequency=4096, waveform_approximant='IMRPhenomD', waveform_reference_frequency=25, waveform_minimum_frequency=10, waveform_pn_phase_order=-1, multiprocess=True):
         """
         """
 
-        # Some of the waveform generator params can be hardcoded/defaulted for ease of use
-        waveform_generator = bilby.gw.WaveformGenerator(
+        # setting up internal varibles for wf generation...
+        self.waveform_generator = bilby.gw.WaveformGenerator(
             duration=waveform_duration, sampling_frequency=sampling_frequency,
             frequency_domain_source_model=bilby.gw.source.lal_binary_black_hole,
             parameter_conversion=bilby.gw.conversion.convert_to_lal_binary_black_hole_parameters,
@@ -338,51 +345,29 @@ class PopulationOmegaGW(object):
                 "pn_phase_order": waveform_pn_phase_order,
             },
         )
-        # These will need to be interpolated to match the requested frequencies
-        waveform_frequencies = waveform_generator.frequency_array
+
+        samples_list = self._reformatted_sample_dict(multiprocess)
+
         wave_energies = []
 
-        for i in tqdm.tqdm(range(self.N_proposal_samples)):
-            inj_sample = {}
-            # Generate the individual parameters dictionary for each injection
-            for key in self.proposal_samples.keys():                
-                inj_sample[key] = self.proposal_samples[key][i]
-                
-            if not 'phase' in inj_sample:
-                inj_sample['phase']=2*np.pi*np.random.rand()
-            if not 'theta_jn' in inj_sample:
-                cos_inc = np.random.rand()*2.-1.
-                inj_sample['theta_jn']=np.arccos(cos_inc)
-            if not 'a_1' in inj_sample:
-                inj_sample['a_1']=0
-            if not 'a_2' in inj_sample:
-                inj_sample['a_2']=0
-            if not 'tilt_1' in inj_sample:
-                inj_sample['tilt_1']=0
-            if not 'tilt_2' in inj_sample:
-                inj_sample['tilt_2']=0
-            use_approxed_waveform=False
-            if waveform_approximant=='PC_waveform':
-                use_approxed_waveform=True
-            '''
-            waveform_frequencies = xp.asarray(waveform_frequencies)
-            wave_en = xp.asarray(wave_energy(waveform_generator, inj_sample, use_approxed_waveform=use_approxed_waveform))
-            wave_energies.append(xp.interp(self.frequency_array, waveform_frequencies, wave_en) )
-            '''
-            wave_en = wave_energy(waveform_generator, inj_sample, use_approxed_waveform=use_approxed_waveform)
-            wave_energies.append(np.interp(self.frequency_array, waveform_frequencies, wave_en) )
-            #could also do cubic interp but takes a bit longer
-            #wave_energies.append(interp1d(waveform_frequencies, wave_en, fill_value=0, bounds_error=False, kind='cubic')(frequency_array))
+        if multiprocess:
+            print('Using multiprocessing, no status bar currently supported... ')
+            pool = multiprocessing.Pool()
+            wave_energies = pool.starmap(get_wave_en, samples_list)
+        else:
+            wave_energies = []
+            for inj_sample in tqdm.tqdm(samples_list):
+                wave_energies.append(get_wave_en(inj_sample, self.waveform_generator, self.frequency_array))
 
         self.wave_energies = xp.array(wave_energies)
         self.wave_energies_calculated = True
 
-    def calculate_omega_gw(self, Lambda=None, Rate_norm=None, **kwargs):
+    def calculate_omega_gw(self, Lambda=None, Rate_norm=None, multiprocess=True, **kwargs):
         """
         """
         
         if not self.wave_energies_calculated:
-            self.calculate_wave_energies(**kwargs)
+            self.calculate_wave_energies(multiprocess=multiprocess, **kwargs)
 
         self.calculate_weights(Lambda=Lambda)    
         
@@ -397,4 +382,74 @@ class PopulationOmegaGW(object):
 
         frequencies = self.frequency_array_xp
         self.omega_gw = omega_gw(frequencies, self.wave_energies, self.weights, Rate_norm=Rate_norm)
+
+    def _get_wave_en(self, inj_sample):
+        if not 'phase' in inj_sample:
+            inj_sample['phase']=2*np.pi*np.random.rand()
+        if not 'theta_jn' in inj_sample:
+            cos_inc = np.random.rand()*2.-1.
+            inj_sample['theta_jn']=np.arccos(cos_inc)
+        if not 'a_1' in inj_sample:
+            inj_sample['a_1']=0
+        if not 'a_2' in inj_sample:
+            inj_sample['a_2']=0
+        if not 'tilt_1' in inj_sample:
+            inj_sample['tilt_1']=0
+        if not 'tilt_2' in inj_sample:
+            inj_sample['tilt_2']=0
+        use_approxed_waveform=False
+        if self.waveform_approximant=='PC_waveform':
+            use_approxed_waveform=True
+        '''
+        waveform_frequencies = xp.asarray(waveform_frequencies)
+        wave_en = xp.asarray(wave_energy(waveform_generator, inj_sample, use_approxed_waveform=use_approxed_waveform))
+        wave_energies.append(xp.interp(self.frequency_array, waveform_frequencies, wave_en) )
+        '''
+        waveform_frequencies = waveform_generator.frequency_array # These will need to be interpolated to match the requested frequencies
+        wave_en = wave_energy(self.waveform_generator, inj_sample, use_approxed_waveform=use_approxed_waveform)
+        #could also do cubic interp but takes a bit longer
+        #wave_energies.append(interp1d(waveform_frequencies, wave_en, fill_value=0, bounds_error=False, kind='cubic')(frequency_array))
+        return np.interp(self.frequency_array, waveform_frequencies, wave_en)
+
+    def _reformatted_sample_dict(self, multiprocess=True):
+        inj_samples = []
+        for i in range(self.N_proposal_samples):
+            inj_sample = {}
+            # Generate the individual parameters dictionary for each injection
+            for key in self.proposal_samples.keys():                
+                inj_sample[key] = self.proposal_samples[key][i]
+            if multiprocess:
+                inj_samples.append([inj_sample, self.waveform_generator, self.frequency_array])    
+            else:
+                inj_samples.append(inj_sample)    
+        return inj_samples
+
+def get_wave_en(inj_sample, waveform_generator, frequency_array):
+    if not 'phase' in inj_sample:
+        inj_sample['phase']=2*np.pi*np.random.rand()
+    if not 'theta_jn' in inj_sample:
+        cos_inc = np.random.rand()*2.-1.
+        inj_sample['theta_jn']=np.arccos(cos_inc)
+    if not 'a_1' in inj_sample:
+        inj_sample['a_1']=0
+    if not 'a_2' in inj_sample:
+        inj_sample['a_2']=0
+    if not 'tilt_1' in inj_sample:
+        inj_sample['tilt_1']=0
+    if not 'tilt_2' in inj_sample:
+        inj_sample['tilt_2']=0
+    
+    use_approxed_waveform=False
+    if waveform_generator.waveform_arguments['waveform_approximant']=='PC_waveform':
+        use_approxed_waveform=True
+    '''
+    waveform_frequencies = xp.asarray(waveform_frequencies)
+    wave_en = xp.asarray(wave_energy(waveform_generator, inj_sample, use_approxed_waveform=use_approxed_waveform))
+    wave_energies.append(xp.interp(self.frequency_array, waveform_frequencies, wave_en) )
+    '''
+    waveform_frequencies = waveform_generator.frequency_array # These will need to be interpolated to match the requested frequencies
+    wave_en = wave_energy(waveform_generator, inj_sample, use_approxed_waveform=use_approxed_waveform)
+    #could also do cubic interp but takes a bit longer
+    #wave_energies.append(interp1d(waveform_frequencies, wave_en, fill_value=0, bounds_error=False, kind='cubic')(frequency_array))
+    return np.interp(frequency_array, waveform_frequencies, wave_en)
 

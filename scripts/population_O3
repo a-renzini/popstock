@@ -22,6 +22,7 @@ import sys
 sys.path.append("/home/arianna.renzini/PROJECTS/popstock")
 
 import argparse
+import distutils
 import json
 import os
 from pathlib import Path
@@ -47,13 +48,18 @@ parser.add_argument('-nt', '--number_trials',help="number of population trials."
 parser.add_argument('-wf', '--waveform_approximant',help="Wavefrom approximant. Default is IMRPhenomD.",action="store", type=str, default='IMRPhenomD')
 parser.add_argument('-rd', '--run_directory',help="Run directory.",action="store", type=str, default='./')
 parser.add_argument('-sm', '--samples',help="Samples to use.",action="store", type=str, default=None)
-parser.add_argument('-fr', '--frequencies',help="txt file with frequencies to use for the spectrum calculation.",action="store", type=str, default=None)
+parser.add_argument('-sid', '--sample_index',help="Index of first sample to include in the cacluation. Samples will be considered in order after this sample. Only considered if both number of samples and sample set are also provided. Default is 0.", action="store", type=int, default=0)
+parser.add_argument('-fr', '--frequencies', help="txt file with frequencies to use for the spectrum calculation.",action="store", type=str, default=None)
+parser.add_argument('-mp', '--multiprocess', help="If True (default), pools the DEdF calculation.", action="store", type=str, default='True')
 args = parser.parse_args()
 
-N_proposal_samples=args.number_samples
+if args.multiprocess:
+    args.multiprocess = bool(distutils.util.strtobool(args.multiprocess))
+else:
+    args.multiprocess = True
+
 N_trials=args.number_trials
 wave_approx=args.waveform_approximant 
-tag=f'{wave_approx}_{N_proposal_samples}_samples_{N_trials}_trials'
 rundir=Path(args.run_directory)
 
 """
@@ -84,19 +90,21 @@ if args.samples is not None:
     samples_dict.pop('Lambda_0')
     if args.number_samples is None:
         args.number_samples = len(samples_dict['redshift'])
+        tag=f'{wave_approx}_{args.number_samples}_samples_{N_trials}_trials'
     else:
-        if args.number_samples is None:
-            args.number_samples = 50000
         for key in samples_dict.keys():
-            samples_dict[key] = samples_dict[key][:args.number_samples]
+            samples_dict[key] = samples_dict[key][args.sample_index:args.sample_index+args.number_samples]
+        tag=f'{wave_approx}_{args.sample_index}_{args.number_samples}_samples_{N_trials}_trials'
     newpop.set_proposal_samples(proposal_samples = samples_dict)
     print(f'Using {args.number_samples} samples...')
 
+
 else:
     Lambda_0 =  {'alpha': 2.5, 'beta': 1, 'delta_m': 3, 'lam': 0.04, 'mmax': 100, 'mmin': 4, 'mpp': 33, 'sigpp':5, 'gamma': 2.7, 'kappa': 3, 'z_peak': 1.9, 'rate': 15}
-    newpop.draw_and_set_proposal_samples(Lambda_0, N_proposal_samples=N_proposal_samples)
+    newpop.draw_and_set_proposal_samples(Lambda_0, N_proposal_samples=args.number_samples)
+    tag=f'{wave_approx}_{args.number_samples}_samples_{N_trials}_trials'
 
-newpop.calculate_omega_gw(waveform_approximant=wave_approx, Lambda=Lambda_0)
+newpop.calculate_omega_gw(waveform_approximant=wave_approx, Lambda=Lambda_0, multiprocess=args.multiprocess)
 
 if args.samples is not None:
     np.savez(f"{os.path.join(rundir, f'omegagw_0_{tag}.npz')}", omega_gw=newpop.omega_gw, freqs=newpop.frequency_array, Lambda_0=Lambda_0)

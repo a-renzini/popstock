@@ -17,6 +17,7 @@
 #
 # This file is part of the popstock package.
 
+import bilby
 import numpy as np
 from gwpopulation.utils import xp
 
@@ -39,6 +40,12 @@ def wave_energy(waveform_generator, injection_parameters, use_approxed_waveform=
     The wave energy spectrum in a np.array.
     """
     #ringdown_frequency=(1.5251 - 1.1568 ) * (c**3 / (2.0 * np.pi * G * M))
+    
+    try:
+        #set optimal waveform duration
+        waveform_generator.waveform_duration = bilby.gw.utils.calculate_time_to_merger(waveform_generator.waveform_arguments['minimum_frequency'], injection_parameters['mass_1_detector'], injection_parameters['mass_2_detector'])
+    except KeyError:
+        pass
     
     if use_approxed_waveform:
         orient_fact = np.cos(injection_parameters['theta_jn'])**2 + ((1+np.cos(injection_parameters['theta_jn'])**2)/2)**2
