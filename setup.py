@@ -31,6 +31,7 @@ setup(
         "gwpy>=3.0.4",
         "astropy>=5.2",
         "gwpopulation",
+        "multiprocessing"
     ],
     extras_require={
         "dev": [
