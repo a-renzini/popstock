@@ -55,8 +55,21 @@ MASS_ALPHAS = {
 
 SKIPPED_KEYS = ['dataset', 'class', 'self']
 class PopulationOmegaGW(object):
+
     def __init__(self, models, mass_coordinates = ['mass_1', 'mass_ratio'], frequency_array=None):
-        
+        """
+        :math:`\Omega_{\rm GW}` population object.
+
+        Parameters
+        =======
+        models: ``gwpopulation.model``
+            Model object formatted as in the ``gwpopulation`` package.
+        mass_coordinates: ``list``
+            List of two parameters to describe binary population masses (e.g. ``[mass_1, mass_ratio]`` by default).
+        frequency_array: ``array-like``
+            If given, used to define the frequency arrray to calculate `\Omega_{\rm GW}(f)` for. Default is ``np.arange(10, 2048)``.
+        """
+
         if frequency_array is not None:
             self.frequency_array=frequency_array
         else:
@@ -115,6 +128,16 @@ class PopulationOmegaGW(object):
         self.wave_energies_calculated = False
     
     def calculate_probabilities(self, samples, population_parameters):
+        """
+        Calculate the probability of drawing the sample set from a specific population.
+        
+        Parameters
+        =======
+        samples: ``dict``
+            Dictionary of binary samples :math:`\Theta`.
+        population_parameters: ``dict``
+            Dictionary of population hyper-parameters :math:`\Lambda`.
+        """
 
         p_masses = self.calculate_p_masses(samples, {key: population_parameters[key] for key in self.model_args['mass']})
         p_z = self.calculate_p_z(samples, {key: population_parameters[key] for key in self.model_args['redshift']})
