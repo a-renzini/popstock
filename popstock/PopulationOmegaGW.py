@@ -68,7 +68,7 @@ class PopulationOmegaGW(object):
         mass_coordinates: ``list``
             List of two parameters to describe binary population masses (e.g. ``[mass_1, mass_ratio]`` by default).
         frequency_array: ``array-like``
-            If given, used to define the frequency array to calculate `\Omega_{\rm GW}(f)` for. Default is ``np.arange(10, 2048)``.
+            If given, used to define the frequency array to calculate `\Omega_{\\text{GW}}(f)` for. Default is ``np.arange(10, 2048)``.
         """
 
         if frequency_array is not None:
