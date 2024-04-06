@@ -58,7 +58,8 @@ class PopulationOmegaGW(object):
 
     def __init__(self, models, mass_coordinates = ['mass_1', 'mass_ratio'], frequency_array=None):
         """
-        :math:`\Omega_{\rm GW}` population object.
+        
+        :math:`\Omega_{\\text{GW}}` population object.
 
         Parameters
         =======
