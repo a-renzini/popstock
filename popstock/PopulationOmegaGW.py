@@ -67,7 +67,7 @@ class PopulationOmegaGW(object):
         mass_coordinates: ``list``
             List of two parameters to describe binary population masses (e.g. ``[mass_1, mass_ratio]`` by default).
         frequency_array: ``array-like``
-            If given, used to define the frequency arrray to calculate `\Omega_{\rm GW}(f)` for. Default is ``np.arange(10, 2048)``.
+            If given, used to define the frequency array to calculate `\Omega_{\rm GW}(f)` for. Default is ``np.arange(10, 2048)``.
         """
 
         if frequency_array is not None:
@@ -150,10 +150,30 @@ class PopulationOmegaGW(object):
         self.pdraws = self.proposal_samples.pop("pdraw")
 
     def calculate_pdraws(self, proposal_samples, fiducial_parameters):
+        """
+        Parameters
+        =======
+        proposal_samples: ``dict``
+            Dictionary of binary samples :math:`\Theta`.
+        fiducial_parameters: ``dict``
+            Dictionary of fiducial population hyper-parameters :math:`\Lambda_0`, from which `proposal_samples` are drawn.
+        """
+
         proposal_samples['pdraw'] = xp.array(self.calculate_probabilities(proposal_samples, fiducial_parameters))
         return proposal_samples
         
     def calculate_p_masses(self, samples, mass_parameters):
+        """
+        Calculate the probability of drawing a set of masses from the reference mass model.
+
+        Parameters
+        =======
+        samples: ``dict``
+            Dictionary of binary mass samples.
+        mass_parameters: ``dict``
+            Dictionary of hyper-parameters for the mass model describing the binary population.
+        """
+
         if hasattr(self.models['mass'], '_q_interpolant'):
             del self.models['mass']._q_interpolant
         input_samples = dict()
@@ -168,6 +188,16 @@ class PopulationOmegaGW(object):
         return p_masses
 
     def calculate_p_z(self, samples, redshift_parameters):
+        """
+        Calculate the probability of drawing a set of redshifts from the reference redshift model.
+
+        Parameters
+        =======
+        samples: ``dict``
+            Dictionary of binary redshift samples :math:`z`.
+        redshift_parameters: ``dict``
+            Dictionary of hyper-parameters for the redshift model describing the binary population.
+        """
         
         self.models['redshift'].cached_dvc_dz = None
         p_z = self.models['redshift'](samples, **redshift_parameters)
@@ -176,6 +206,17 @@ class PopulationOmegaGW(object):
         return p_z
 
     def calculate_p_spin_models(self, samples, parameters):
+        """
+        Calculate the probability of drawing a set of spins from the reference spin model.
+
+        Parameters
+        =======
+        samples: ``dict``
+            Dictionary of binary spin samples.
+        parameters: ``dict``
+            Dictionary of hyper-parameters for the spin model describing the binary population.
+        """
+
         prob = 1
 
         for model in self.spin_models:
