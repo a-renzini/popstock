@@ -2,7 +2,7 @@
 About ``popstock``
 ==============================================
 
-`\tt popstock`: a python--based open--source package for the rapid computation of gravitational-wave background (GWB) fractional energy density spectra such as :math: `\Omega_{\rm GW}`, for a given realization of events, and its ensemble average :math: `\bar{\Omega}_{\rm GW}` for a given set of hyper-parameters  :math: `\Lambda`. 
+`popstock`: a python--based open--source package for the rapid computation of gravitational-wave background (GWB) fractional energy density spectra such as :math: `\Omega_{\rm GW}`, for a given realization of events, and its ensemble average :math: `\bar{\Omega}_{\rm GW}` for a given set of hyper-parameters  :math: `\Lambda`. 
 
 Other than the standard python scientific libraries `numpy` and `scipy`, the main dependencies of the `popstock` package are: 
 
