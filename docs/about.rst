@@ -12,4 +12,4 @@ Other than the standard python scientific libraries `numpy` and `scipy`, the mai
 
 The `popstock` package also relies on `multiprocessing` (included in most python distributions) to parallelize the computations for the large number of samples required for high-precision GWB evaluation.
 
-The gravitational-wave waveforms required to compute `\Omega_{\rm GW}` are imported by `bilby` from the LIGO Scientific Collaboration Algorithm Library (LAL), which is also required during package installation.
+The gravitational-wave waveforms required to compute :math: `\Omega_{\rm GW}` are imported by `bilby` from the LIGO Scientific Collaboration Algorithm Library (LAL), which is also required during package installation.
