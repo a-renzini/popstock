@@ -103,4 +103,4 @@ will automatically be installed, and this should minimise dependency conflicts.
 
 
 .. note::
-  Please report broken versions and dependencies as soon as possible by opening an [issue](https://github.com/a-renzini/popstock/issues)!
+  Please report broken versions and dependencies as soon as possible by opening an `issue <https://github.com/a-renzini/popstock/issues>`_!
