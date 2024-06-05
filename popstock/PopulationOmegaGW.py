@@ -22,13 +22,14 @@ import multiprocessing
 import bilby
 import numpy as np
 import tqdm
+import gwpopulation
 from bilby.core.prior import Interped
 from bilby.core.utils import infer_args_from_function_except_n_args
-from gwpopulation.utils import xp
 from scipy.interpolate import interp1d
 
 from popstock.constants import z_to_dL_interpolant
 from popstock.util import omega_gw, pdf_powerlaw, sample_powerlaw, wave_energy
+from gwpopulation.utils import xp
 
 REQUIRED_MODELS = ['mass', 'redshift']
 SPIN_MODELS = ['a_1', 'a_2',  'cos_tilt_1', 'cos_tilt_2', 'chi_eff', 'chi_p']
@@ -56,7 +57,7 @@ MASS_ALPHAS = {
 SKIPPED_KEYS = ['dataset', 'class', 'self']
 class PopulationOmegaGW(object):
 
-    def __init__(self, models, mass_coordinates = ['mass_1', 'mass_ratio'], frequency_array=None):
+    def __init__(self, models, mass_coordinates = ['mass_1', 'mass_ratio'], frequency_array=None, backend='numpy'):
         """
         
         :math:`\Omega_{\\text{GW}}` population object.
@@ -70,6 +71,9 @@ class PopulationOmegaGW(object):
         frequency_array: ``array-like``
             If given, used to define the frequency array to calculate `\Omega_{\\text{GW}}(f)` for. Default is ``np.arange(10, 2048)``.
         """
+
+        gwpopulation.set_backend(backend)
+        from gwpopulation.utils import xp
 
         if frequency_array is not None:
             self.frequency_array=frequency_array
@@ -143,7 +147,6 @@ class PopulationOmegaGW(object):
         p_masses = self.calculate_p_masses(samples, {key: population_parameters[key] for key in self.model_args['mass']})
         p_z = self.calculate_p_z(samples, {key: population_parameters[key] for key in self.model_args['redshift']})
         p_spins = self.calculate_p_spin_models(samples, population_parameters)
-
         return p_masses * p_z * p_spins
 
     def set_pdraws_source(self):
@@ -382,6 +385,8 @@ class PopulationOmegaGW(object):
         self.N_proposal_samples = len(proposal_samples['pdraw'])
 
         self.set_pdraws_source()
+        
+        self.proposal_samples_set = True
 
     def calculate_weights(self, Lambda=None):
         """
@@ -427,6 +432,16 @@ class PopulationOmegaGW(object):
         self.wave_energies = xp.array(wave_energies)
         self.wave_energies_calculated = True
 
+    def to_cupy(self):
+        import cupy as cp
+        gwpopulation.set_backend('cupy')
+        from gwpopulation.utils import xp
+        if self.wave_energies_calculated:
+            self.wave_energies = cp.asarray(self.wave_energies)
+        if self.proposal_samples_set:
+            for key in self.proposal_samples.keys():
+                self.proposal_samples[key] = cp.asarray(self.proposal_samples[key])
+
     def calculate_omega_gw(self, Lambda=None, Rate_norm=None, multiprocess=True, **kwargs):
         """
         """
@@ -471,7 +486,7 @@ class PopulationOmegaGW(object):
         wave_energies.append(xp.interp(self.frequency_array, waveform_frequencies, wave_en) )
         '''
         waveform_frequencies = waveform_generator.frequency_array # These will need to be interpolated to match the requested frequencies
-        wave_en = wave_energy(self.waveform_generator, inj_sample, use_approxed_waveform=use_approxed_waveform)
+        wave_en = wave_energy(self.waveform_generator, inj_sample, use_approxed_waveform=use_approxed_waveform, inspiral_only=inspiral_only)
         #could also do cubic interp but takes a bit longer
         #wave_energies.append(interp1d(waveform_frequencies, wave_en, fill_value=0, bounds_error=False, kind='cubic')(frequency_array))
         return np.interp(self.frequency_array, waveform_frequencies, wave_en)
@@ -505,15 +520,19 @@ def get_wave_en(inj_sample, waveform_generator, frequency_array):
         inj_sample['tilt_2']=0
     
     use_approxed_waveform=False
+    inspiral_only=False
     if waveform_generator.waveform_arguments['waveform_approximant']=='PC_waveform':
         use_approxed_waveform=True
+    elif waveform_generator.waveform_arguments['waveform_approximant']=='PC_waveform_inspiral_only':
+        use_approxed_waveform=True
+        inspiral_only=True
     '''
     waveform_frequencies = xp.asarray(waveform_frequencies)
     wave_en = xp.asarray(wave_energy(waveform_generator, inj_sample, use_approxed_waveform=use_approxed_waveform))
     wave_energies.append(xp.interp(self.frequency_array, waveform_frequencies, wave_en) )
     '''
     waveform_frequencies = waveform_generator.frequency_array # These will need to be interpolated to match the requested frequencies
-    wave_en = wave_energy(waveform_generator, inj_sample, use_approxed_waveform=use_approxed_waveform)
+    wave_en = wave_energy(waveform_generator, inj_sample, use_approxed_waveform=use_approxed_waveform, inspiral_only=inspiral_only)
     #could also do cubic interp but takes a bit longer
     #wave_energies.append(interp1d(waveform_frequencies, wave_en, fill_value=0, bounds_error=False, kind='cubic')(frequency_array))
     return np.interp(frequency_array, waveform_frequencies, wave_en)
