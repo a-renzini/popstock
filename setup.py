@@ -30,7 +30,8 @@ setup(
         "bilby>=1.4",
         "gwpy>=3.0.4",
         "astropy>=5.2",
-        "gwpopulation"
+        "gwpopulation",
+        "lalsuite>=7.3",
     ],
     extras_require={
         "dev": [
