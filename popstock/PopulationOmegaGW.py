@@ -20,16 +20,16 @@
 import multiprocessing
 
 import bilby
+import gwpopulation
 import numpy as np
 import tqdm
-import gwpopulation
 from bilby.core.prior import Interped
 from bilby.core.utils import infer_args_from_function_except_n_args
+from gwpopulation.utils import xp
 from scipy.interpolate import interp1d
 
 from popstock.constants import z_to_dL_interpolant
 from popstock.util import omega_gw, pdf_powerlaw, sample_powerlaw, wave_energy
-from gwpopulation.utils import xp
 
 REQUIRED_MODELS = ['mass', 'redshift']
 SPIN_MODELS = ['a_1', 'a_2',  'cos_tilt_1', 'cos_tilt_2', 'chi_eff', 'chi_p']
