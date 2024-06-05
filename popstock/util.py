@@ -24,7 +24,7 @@ from gwpopulation.utils import xp
 from popstock.constants import H0
 
 
-def wave_energy(waveform_generator, injection_parameters, use_approxed_waveform=False):
+def wave_energy(waveform_generator, injection_parameters, use_approxed_waveform=False, inspiral_only=False):
     """
     Compute the GW energy for a given waveform and set of parameters.
 
@@ -49,7 +49,7 @@ def wave_energy(waveform_generator, injection_parameters, use_approxed_waveform=
     
     if use_approxed_waveform:
         orient_fact = np.cos(injection_parameters['theta_jn'])**2 + ((1+np.cos(injection_parameters['theta_jn'])**2)/2)**2
-        return (orient_fact*np.abs(waveform_approx_amplitude(injection_parameters, frequencies=waveform_generator.frequency_array))**2)
+        return (orient_fact*np.abs(waveform_approx_amplitude(injection_parameters, frequencies=waveform_generator.frequency_array, inspiral_only=inspiral_only))**2)
     
     try:
         polarizations = waveform_generator.frequency_domain_strain(injection_parameters)
@@ -59,8 +59,8 @@ def wave_energy(waveform_generator, injection_parameters, use_approxed_waveform=
         print('ouch!')
         return np.zeros_like(waveform_generator.frequency_array)
 
-
-def waveform_approx_amplitude(injection_parameters, frequencies):
+    
+def waveform_approx_amplitude(injection_parameters, frequencies, inspiral_only=False):
     """Ajith+, Sammut+"""
     
     # I-M-R frequencies
@@ -79,16 +79,24 @@ def waveform_approx_amplitude(injection_parameters, frequencies):
     f_ring /= float(1+injection_parameters['redshift'])
     f_cut /= float(1+injection_parameters['redshift'])
     sigma /= float(1+injection_parameters['redshift'])
-    
+
+    # NEW: cut binaries at ISCO if only inspiral phase is considered.
+    # This causes the turn-off in the BNS spectrum.
+    f_ISCO = 1/(6.**(3./2.)*np.pi*total_mass_scaled) / float(1+injection_parameters['redshift'])
+    #
+
     mask_insp = frequencies < f_merg
     mask_merg = (frequencies >= f_merg) & (frequencies < f_ring)
     mask_ring = (frequencies >= f_ring) & (frequencies < f_cut)
     
     # piece-wise wave amplitude
     wave_amplitude = np.zeros(len(frequencies))
-    wave_amplitude[mask_insp] = (frequencies[mask_insp]/f_merg)**(-7/6)
-    wave_amplitude[mask_merg] =  (frequencies[mask_merg]/f_merg)**(-2/3)
-    wave_amplitude[mask_ring] = ( 1/(1 + ( (frequencies[mask_ring]-f_ring)/(sigma/2) )**2 ) )*(f_ring/f_merg)**(-2/3)
+    if not inspiral_only:
+        wave_amplitude[mask_insp] = (frequencies[mask_insp]/f_merg)**(-7/6)
+        wave_amplitude[mask_merg] =  (frequencies[mask_merg]/f_merg)**(-2/3)
+        wave_amplitude[mask_ring] = ( 1/(1 + ( (frequencies[mask_ring]-f_ring)/(sigma/2) )**2 ) )*(f_ring/f_merg)**(-2/3)
+    else:
+        wave_amplitude[frequencies<f_ISCO] = (frequencies[frequencies<f_ISCO]/f_merg)**(-7/6)
     
     #set zero frequency to zero just in case
     wave_amplitude[0] = 0
@@ -96,7 +104,6 @@ def waveform_approx_amplitude(injection_parameters, frequencies):
     dL_in_m = float(injection_parameters['luminosity_distance']*kpc.value*1.e3)
     const = (G*total_mass_in_kg*float(1+injection_parameters['redshift']))**(5/6) * f_merg**(-7/6)/(dL_in_m)/np.pi**(2/3) * (5*sym_mass_ratio/24)**(1/2) / light_speed**(3/2)
     return const * wave_amplitude
-    
     
 def omega_gw(frequencies, wave_energies, weights,  Rate_norm):
     """
@@ -118,7 +125,7 @@ def omega_gw(frequencies, wave_energies, weights,  Rate_norm):
     The wave energy spectrum in a np.array.
     """
     conv = frequencies**3 * 4. * np.pi**2 / (3 * H0.si.value**2)
-    weighted_energy = xp.sum(weights[:, None] * wave_energies, axis=0) / len(weights)
+    weighted_energy = xp.nansum(weights[:, None] * wave_energies, axis=0) / len(weights)
 
     return Rate_norm * conv * weighted_energy
 
