@@ -394,7 +394,7 @@ class PopulationOmegaGW(object):
         else:
             self.weights = np.ones(self.N_proposal_samples)
 
-    def calculate_wave_energies(self, waveform_duration=10, sampling_frequency=4096, waveform_approximant='IMRPhenomD', waveform_reference_frequency=25, waveform_minimum_frequency=10, waveform_pn_phase_order=-1, multiprocess=True):
+    def calculate_wave_energies(self, waveform_duration=10, sampling_frequency=4096, waveform_approximant='IMRPhenomD', waveform_reference_frequency=25, waveform_minimum_frequency=10, waveform_pn_phase_order=-1, T_obs=1.e4, multiprocess=True):
         """
         """
 
@@ -410,6 +410,7 @@ class PopulationOmegaGW(object):
                 "pn_phase_order": waveform_pn_phase_order,
             },
         )
+        self.T_obs = T_obs
 
         samples_list = self._reformatted_sample_dict(multiprocess)
 
@@ -422,7 +423,7 @@ class PopulationOmegaGW(object):
         else:
             wave_energies = []
             for inj_sample in tqdm.tqdm(samples_list):
-                wave_energies.append(get_wave_en(inj_sample, self.waveform_generator, self.frequency_array))
+                wave_energies.append(get_wave_en(inj_sample, self.waveform_generator, self.frequency_array, self.T_obs))
 
         self.wave_energies = xp.array(wave_energies)
         self.wave_energies_calculated = True
@@ -484,12 +485,12 @@ class PopulationOmegaGW(object):
             for key in self.proposal_samples.keys():                
                 inj_sample[key] = self.proposal_samples[key][i]
             if multiprocess:
-                inj_samples.append([inj_sample, self.waveform_generator, self.frequency_array])    
+                inj_samples.append([inj_sample, self.waveform_generator, self.frequency_array, self.T_obs])    
             else:
                 inj_samples.append(inj_sample)    
         return inj_samples
 
-def get_wave_en(inj_sample, waveform_generator, frequency_array):
+def get_wave_en(inj_sample, waveform_generator, frequency_array, T_obs=1.e4):
     if not 'phase' in inj_sample:
         inj_sample['phase']=2*np.pi*np.random.rand()
     if not 'theta_jn' in inj_sample:
@@ -513,7 +514,7 @@ def get_wave_en(inj_sample, waveform_generator, frequency_array):
     wave_energies.append(xp.interp(self.frequency_array, waveform_frequencies, wave_en) )
     '''
     waveform_frequencies = waveform_generator.frequency_array # These will need to be interpolated to match the requested frequencies
-    wave_en = wave_energy(waveform_generator, inj_sample, use_approxed_waveform=use_approxed_waveform)
+    wave_en = wave_energy(waveform_generator, inj_sample, use_approxed_waveform=use_approxed_waveform, T_obs=T_obs)
     #could also do cubic interp but takes a bit longer
     #wave_energies.append(interp1d(waveform_frequencies, wave_en, fill_value=0, bounds_error=False, kind='cubic')(frequency_array))
     return np.interp(frequency_array, waveform_frequencies, wave_en)

@@ -24,7 +24,7 @@ from gwpopulation.utils import xp
 from popstock.constants import H0
 
 
-def wave_energy(waveform_generator, injection_parameters, use_approxed_waveform=False):
+def wave_energy(waveform_generator, injection_parameters, use_approxed_waveform=False, T_obs=1.e4):
     """
     Compute the GW energy for a given waveform and set of parameters.
 
@@ -41,6 +41,9 @@ def wave_energy(waveform_generator, injection_parameters, use_approxed_waveform=
     """
     #ringdown_frequency=(1.5251 - 1.1568 ) * (c**3 / (2.0 * np.pi * G * M))
     
+    if max(waveform_generator.frequency_array)<1:
+        LISA_band = True
+
     try:
         #set optimal waveform duration
         waveform_generator.waveform_duration = bilby.gw.utils.calculate_time_to_merger(waveform_generator.waveform_arguments['minimum_frequency'], injection_parameters['mass_1_detector'], injection_parameters['mass_2_detector'])
@@ -49,7 +52,7 @@ def wave_energy(waveform_generator, injection_parameters, use_approxed_waveform=
     
     if use_approxed_waveform:
         orient_fact = np.cos(injection_parameters['theta_jn'])**2 + ((1+np.cos(injection_parameters['theta_jn'])**2)/2)**2
-        return (orient_fact*np.abs(waveform_approx_amplitude(injection_parameters, frequencies=waveform_generator.frequency_array))**2)
+        return (orient_fact*np.abs(waveform_approx_amplitude(injection_parameters, frequencies=waveform_generator.frequency_array, T_obs=T_obs))**2) 
     
     try:
         polarizations = waveform_generator.frequency_domain_strain(injection_parameters)
@@ -60,8 +63,13 @@ def wave_energy(waveform_generator, injection_parameters, use_approxed_waveform=
         return np.zeros_like(waveform_generator.frequency_array)
 
 
-def waveform_approx_amplitude(injection_parameters, frequencies):
+def waveform_approx_amplitude(injection_parameters, frequencies, T_obs = 1e4):
     """Ajith+, Sammut+"""
+    # allow for LISA band computations
+    if max(frequencies)<1:
+        LISA_band = True
+    else:
+        LISA_band = False
     
     # I-M-R frequencies
     from .constants import G, light_speed, m_sun, mass_to_seconds_conv
@@ -89,9 +97,25 @@ def waveform_approx_amplitude(injection_parameters, frequencies):
     wave_amplitude[mask_insp] = (frequencies[mask_insp]/f_merg)**(-7/6)
     wave_amplitude[mask_merg] =  (frequencies[mask_merg]/f_merg)**(-2/3)
     wave_amplitude[mask_ring] = ( 1/(1 + ( (frequencies[mask_ring]-f_ring)/(sigma/2) )**2 ) )*(f_ring/f_merg)**(-2/3)
-    
-    #set zero frequency to zero just in case
-    wave_amplitude[0] = 0
+
+    #LISA band
+    if LISA_band:
+        freq_enter = np.random.rand()*(frequencies[-1]-frequencies[0]) + frequencies[0] 
+        #freq_enter = np.array(sample_powerlaw(-11/3, low = 1.e-4, high = frequencies[-1], N = 1))
+        from popstock.util_LISA import f_exit
+        freq_exit = f_exit(sym_mass_ratio, total_mass_in_kg, freq_enter, T_obs)
+        df = frequencies[1] - frequencies[0] # frequency bin width
+        #if freq_enter>5.e-3: 
+        if np.isinf(freq_exit):
+            mask_LISA = (frequencies > freq_enter-df) 
+        else:
+            mask_LISA = (frequencies > freq_enter-df+df/2.) & (frequencies < freq_exit+df/2.)
+            #mask_LISA = (frequencies > freq_enter-df+df/2.) & (frequencies < freq_enter+df/2.)
+        wave_amplitude[~mask_LISA] = 0.0 * frequencies[~mask_LISA] 
+
+    if not LISA_band:
+        #set zero frequency to zero just in case
+        wave_amplitude[0] = 0
     from astropy.constants import kpc
     dL_in_m = float(injection_parameters['luminosity_distance']*kpc.value*1.e3)
     const = (G*total_mass_in_kg*float(1+injection_parameters['redshift']))**(5/6) * f_merg**(-7/6)/(dL_in_m)/np.pi**(2/3) * (5*sym_mass_ratio/24)**(1/2) / light_speed**(3/2)
@@ -117,8 +141,23 @@ def omega_gw(frequencies, wave_energies, weights,  Rate_norm):
     =======
     The wave energy spectrum in a np.array.
     """
+    if max(frequencies)<1:
+        LISA_band = True
+    else:
+        LISA_band = False
+
     conv = frequencies**3 * 4. * np.pi**2 / (3 * H0.si.value**2)
-    weighted_energy = xp.sum(weights[:, None] * wave_energies, axis=0) / len(weights)
+
+    if LISA_band:
+        # reset conversion for non-evolving binaries
+        #wave_energies[wave_energies.T[-1]==0.] *= frequencies**(-3) / (frequencies[1]-frequencies[0]) 
+        number_samples_per_f_bin = np.sum(wave_energies!=0, axis=0)
+        wave_energies_norm = number_samples_per_f_bin
+
+    else:
+        wave_energies_norm = len(weights)
+
+    weighted_energy = xp.nansum(weights[:, None] * (wave_energies / wave_energies_norm), axis=0) 
 
     return Rate_norm * conv * weighted_energy
 
