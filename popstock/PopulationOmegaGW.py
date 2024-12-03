@@ -517,5 +517,12 @@ def get_wave_en(inj_sample, waveform_generator, frequency_array, T_obs=1.e4):
     wave_en = wave_energy(waveform_generator, inj_sample, use_approxed_waveform=use_approxed_waveform, T_obs=T_obs)
     #could also do cubic interp but takes a bit longer
     #wave_energies.append(interp1d(waveform_frequencies, wave_en, fill_value=0, bounds_error=False, kind='cubic')(frequency_array))
-    return np.interp(frequency_array, waveform_frequencies, wave_en)
+    # if no resampling, just mask frequencies; otherwise interpolate
+    df_old = waveform_frequencies[1]-waveform_frequencies[0]
+    df_new = frequency_array[1]-frequency_array[0]
+    if df_old == df_new:
+        mask = (waveform_frequencies >= frequency_array[0]) & (waveform_frequencies <= frequency_array[-1])
+        return wave_en[mask]
+    else:
+        return np.interp(frequency_array, waveform_frequencies, wave_en)
 

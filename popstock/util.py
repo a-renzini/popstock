@@ -43,33 +43,38 @@ def wave_energy(waveform_generator, injection_parameters, use_approxed_waveform=
     
     if max(waveform_generator.frequency_array)<1:
         LISA_band = True
+    else:
+        LISA_band = False
 
     try:
         #set optimal waveform duration
         waveform_generator.waveform_duration = bilby.gw.utils.calculate_time_to_merger(waveform_generator.waveform_arguments['minimum_frequency'], injection_parameters['mass_1_detector'], injection_parameters['mass_2_detector'])
     except KeyError:
         pass
-    
+
     if use_approxed_waveform:
         orient_fact = np.cos(injection_parameters['theta_jn'])**2 + ((1+np.cos(injection_parameters['theta_jn'])**2)/2)**2
-        return (orient_fact*np.abs(waveform_approx_amplitude(injection_parameters, frequencies=waveform_generator.frequency_array, T_obs=T_obs))**2) 
+        res = (orient_fact*np.abs(waveform_approx_amplitude(injection_parameters, frequencies=waveform_generator.frequency_array, T_obs=T_obs))**2) 
     
-    try:
-        polarizations = waveform_generator.frequency_domain_strain(injection_parameters)
-        # Could make this into a FrequencySeries...
-        return (np.abs(polarizations['plus'])**2 + np.abs(polarizations['cross'])**2)
-    except:
-        print('ouch!')
-        return np.zeros_like(waveform_generator.frequency_array)
+    else:
+        try:
+            polarizations = waveform_generator.frequency_domain_strain(injection_parameters)
+            # Could make this into a FrequencySeries...
+            res = (np.abs(polarizations['plus'])**2 + np.abs(polarizations['cross'])**2)
+        except:
+            print('ouch!')
+            res = np.zeros_like(waveform_generator.frequency_array)
+
+    if LISA_band:
+        from popstock.util_LISA import LISA_frequency_mask
+        mask_LISA = LISA_frequency_mask(injection_parameters, frequencies=waveform_generator.frequency_array, T_obs = T_obs)
+        res[~mask_LISA] = 0.0 * waveform_generator.frequency_array[~mask_LISA] 
+
+    return res
 
 
 def waveform_approx_amplitude(injection_parameters, frequencies, T_obs = 1e4):
     """Ajith+, Sammut+"""
-    # allow for LISA band computations
-    if max(frequencies)<1:
-        LISA_band = True
-    else:
-        LISA_band = False
     
     # I-M-R frequencies
     from .constants import G, light_speed, m_sun, mass_to_seconds_conv
@@ -97,7 +102,13 @@ def waveform_approx_amplitude(injection_parameters, frequencies, T_obs = 1e4):
     wave_amplitude[mask_insp] = (frequencies[mask_insp]/f_merg)**(-7/6)
     wave_amplitude[mask_merg] =  (frequencies[mask_merg]/f_merg)**(-2/3)
     wave_amplitude[mask_ring] = ( 1/(1 + ( (frequencies[mask_ring]-f_ring)/(sigma/2) )**2 ) )*(f_ring/f_merg)**(-2/3)
-
+    
+    '''
+    # allow for LISA band computations
+    if max(frequencies)<1:
+        LISA_band = True
+    else:
+        LISA_band = False
     #LISA band
     if LISA_band:
         freq_enter = np.random.rand()*(frequencies[-1]-frequencies[0]) + frequencies[0] 
@@ -105,17 +116,16 @@ def waveform_approx_amplitude(injection_parameters, frequencies, T_obs = 1e4):
         from popstock.util_LISA import f_exit
         freq_exit = f_exit(sym_mass_ratio, total_mass_in_kg, freq_enter, T_obs)
         df = frequencies[1] - frequencies[0] # frequency bin width
-        #if freq_enter>5.e-3: 
         if np.isinf(freq_exit):
             mask_LISA = (frequencies > freq_enter-df) 
         else:
             mask_LISA = (frequencies > freq_enter-df+df/2.) & (frequencies < freq_exit+df/2.)
-            #mask_LISA = (frequencies > freq_enter-df+df/2.) & (frequencies < freq_enter+df/2.)
         wave_amplitude[~mask_LISA] = 0.0 * frequencies[~mask_LISA] 
 
-    if not LISA_band:
+    '''
+    # if not LISA_band:
         #set zero frequency to zero just in case
-        wave_amplitude[0] = 0
+        # wave_amplitude[0] = 0
     from astropy.constants import kpc
     dL_in_m = float(injection_parameters['luminosity_distance']*kpc.value*1.e3)
     const = (G*total_mass_in_kg*float(1+injection_parameters['redshift']))**(5/6) * f_merg**(-7/6)/(dL_in_m)/np.pi**(2/3) * (5*sym_mass_ratio/24)**(1/2) / light_speed**(3/2)
