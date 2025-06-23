@@ -18,7 +18,7 @@
 # This file is part of the popstock package.
 
 from astropy.constants import c
-from astropy.cosmology import Planck18 as cosmo
+from astropy.cosmology import Planck15 as cosmo
 
 H0 = cosmo.H(0)
 light_speed = c.value
