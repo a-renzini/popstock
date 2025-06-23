@@ -125,7 +125,11 @@ def omega_gw(frequencies, wave_energies, weights,  Rate_norm):
     The wave energy spectrum in a np.array.
     """
     conv = frequencies**3 * 4. * np.pi**2 / (3 * H0.si.value**2)
-    weighted_energy = xp.nansum(weights[:, None] * wave_energies, axis=0) / len(weights)
+    # might consider adding some checks for re-weighting, like:
+    # highvals = np.sort(weights)[-10:]
+    # weights[weights==highvals]=0
+    N_samples = len(weights) 
+    weighted_energy = xp.nansum(weights[:, None] * wave_energies, axis=0) / N_samples
 
     return Rate_norm * conv * weighted_energy
 
@@ -140,7 +144,7 @@ def sample_powerlaw(spectral_index, low, high, N):
     """
     This is the actual spectral index x^alpha, not the negative of the spectral index
     """
-    unit_samples = np.random.random(N)
+    unit_samples = xp.random.random(N)
     return icdf_powerlaw(unit_samples, alpha = spectral_index, low = low, high = high)
 
 def pdf_powerlaw(value, alpha, low, high):
