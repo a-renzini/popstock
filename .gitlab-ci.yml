@@ -31,10 +31,6 @@ stages:
           ${script} --help;
       done
 
-basic-3.8:
-  <<: *basic-python
-  image: python:3.8
-
 basic-3.9:
   <<: *basic-python
   image: python:3.9
@@ -58,13 +54,13 @@ basic-3.10:
       #- pre-commit run --files tutorials/*.py --verbose --show-diff-on-failure
     - pre-commit run --files *.py --verbose --show-diff-on-failure
 
-precommits-py3.8:
+precommits-py3.9:
   <<: *precommits-python
-  image: python:3.8
+  image: python:3.9
 
 documentation:
   stage: documentation
-  image: python:3.8
+  image: python:3.9
   before_script:
     - apt-get -yqq update
     - apt-get -yqq install pandoc
