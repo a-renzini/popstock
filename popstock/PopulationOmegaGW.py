@@ -30,11 +30,10 @@ from scipy.interpolate import interp1d
 from popstock.constants import z_to_dL_interpolant
 from popstock.util import omega_gw, pdf_powerlaw, sample_powerlaw, wave_energy
 
-import gwpopulation
 gwpopulation.set_backend('numpy')
-from gwpopulation.utils import xp
-
 import warnings
+
+from gwpopulation.utils import xp
 
 REQUIRED_MODELS = ['mass', 'redshift']
 SPIN_MODELS = ['a_1', 'a_2',  'cos_tilt_1', 'cos_tilt_2', 'chi_eff', 'chi_p', 'spin_tilt', 'spin_magnitude']
