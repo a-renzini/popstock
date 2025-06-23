@@ -25,14 +25,19 @@ import numpy as np
 import tqdm
 from bilby.core.prior import Interped
 from bilby.core.utils import infer_args_from_function_except_n_args
-from gwpopulation.utils import xp
 from scipy.interpolate import interp1d
 
 from popstock.constants import z_to_dL_interpolant
 from popstock.util import omega_gw, pdf_powerlaw, sample_powerlaw, wave_energy
 
+import gwpopulation
+gwpopulation.set_backend('numpy')
+from gwpopulation.utils import xp
+
+import warnings
+
 REQUIRED_MODELS = ['mass', 'redshift']
-SPIN_MODELS = ['a_1', 'a_2',  'cos_tilt_1', 'cos_tilt_2', 'chi_eff', 'chi_p']
+SPIN_MODELS = ['a_1', 'a_2',  'cos_tilt_1', 'cos_tilt_2', 'chi_eff', 'chi_p', 'spin_tilt', 'spin_magnitude']
 
 SPIN_GRIDS = {
     'a_1': xp.linspace(0, 1, 1000),
@@ -42,10 +47,10 @@ SPIN_GRIDS = {
 }
 
 MASS_GRIDS = {
-    'mass_1': xp.linspace(1, 100, 1000),
-    'mass_ratio': xp.linspace(0.0001, 1, 1000),
-    'mass_2': xp.linspace(1, 100, 1000),
-    'total_mass': xp.linspace(2, 250, 1000)
+    'mass_1': xp.linspace(1, 300, 1500), 
+    'mass_ratio': xp.linspace(0.0001, 1, 1500),
+    'mass_2': xp.linspace(1, 300, 1500),
+    'total_mass': xp.linspace(2, 250, 1500)
 }
 
 MASS_ALPHAS = {
@@ -55,6 +60,7 @@ MASS_ALPHAS = {
 }
 
 SKIPPED_KEYS = ['dataset', 'class', 'self']
+
 class PopulationOmegaGW(object):
 
     def __init__(self, models, mass_coordinates = ['mass_1', 'mass_ratio'], frequency_array=None, backend='numpy'):
@@ -120,8 +126,13 @@ class PopulationOmegaGW(object):
             self.models['mass_ratio'] = self.models['mass'].p_q
 
         elif self.other_mass_coord == 'mass_2':
-            assert hasattr(self.models['mass'], "p_m2")
-            self.models['mass_2'] = self.models['mass'].p_m2
+            try: 
+                assert hasattr(self.models['mass'], "p_m2")
+                self.models['mass_2'] = self.models['mass'].p_m2
+            except AssertionError:
+                warnings.warn('mass_2 selected as secondary mass parameter, but no p_m2 model passed. Setting identical model for mass_2.')
+                self.models['mass_2'] = self.models['mass']
+            
  
         elif self.other_mass_coord == 'total_mass':
             assert hasattr(self.models['mass'], "p_mtotal")
@@ -177,7 +188,6 @@ class PopulationOmegaGW(object):
         mass_parameters: ``dict``
             Dictionary of hyper-parameters for the mass model describing the binary population.
         """
-
         if hasattr(self.models['mass'], '_q_interpolant'):
             del self.models['mass']._q_interpolant
         input_samples = dict()
@@ -188,7 +198,6 @@ class PopulationOmegaGW(object):
                 input_samples[key] = samples[key]
 
         p_masses = self.models['mass'](input_samples, **mass_parameters)
-        
         return p_masses
 
     def calculate_p_z(self, samples, redshift_parameters):
@@ -206,7 +215,6 @@ class PopulationOmegaGW(object):
         self.models['redshift'].cached_dvc_dz = None
         p_z = self.models['redshift'](samples, **redshift_parameters)
         self.models['redshift'].cached_dvc_dz = None
-        
         return p_z
 
     def calculate_p_spin_models(self, samples, parameters):
@@ -227,11 +235,11 @@ class PopulationOmegaGW(object):
             prob *= self.models[model](samples, **{key: parameters[key] for key in self.model_args[model]})
         return prob
 
-    def draw_and_set_proposal_samples(self, fiducial_parameters, N_proposal_samples = int(1e3)):
+    def draw_and_set_proposal_samples(self, fiducial_parameters, N_proposal_samples = int(1e3), **sampling_kwargs):
         if not fiducial_parameters:
             raise ValueError("No valid parameters passed to set proposal samples.")
         self.fiducial_parameters = fiducial_parameters.copy()
-        proposal_samples = self.draw_source_proposal_samples(self.fiducial_parameters, N_proposal_samples)
+        proposal_samples = self.draw_source_proposal_samples(self.fiducial_parameters, N_proposal_samples, **sampling_kwargs)
         
         self.set_proposal_samples(proposal_samples=proposal_samples)
 
@@ -239,58 +247,92 @@ class PopulationOmegaGW(object):
         samples = {key: [] for key in self.mass_coordinates}
         iteration = 0
         n_try = 100*N
-
-        try:
-            alpha_mass = population_params['alpha']
-        except KeyError:
-            alpha_mass = population_params['alpha_1']
-
+                
+        if 'mmin' in population_params.keys():
+            low = float(population_params['mmin'])
+        else:
+            low = 3.0
+        if 'mmax' in population_params.keys():
+            high = float(population_params['mmax'])
+        else:
+            high = 100.0
+            
+        al_names = ['alpha', 'alpha1', 'alpha_1']
+        
+        alpha_mass = None
+        for al in al_names:
+            if al in population_params.keys():
+                alpha_mass = 2.0 #np.abs(population_params[al])  #TODO!
+        if alpha_mass is None:
+            alpha_mass = 3.0
+        
         while len(samples[self.mass_coordinates[0]]) < N:
-            initial_samples = dict()
-            initial_samples['mass_1'] = np.array(sample_powerlaw(-1*alpha_mass, 
-                                        low = population_params['mmin'],
-                                        high = population_params['mmax'],
+            # change such that alpha changes based on efficiency?
+            initial_samples = dict()            
+            initial_samples['mass_1'] = xp.array(sample_powerlaw(-1*alpha_mass, 
+                                        low = low,
+                                        high = high,
                                         N = n_try,
                                         ) )
             
-            initial_samples['p_draw']= pdf_powerlaw(initial_samples["mass_1"],  
+            initial_samples['p_draw']= xp.array(pdf_powerlaw(initial_samples["mass_1"],  
                                                      -1*alpha_mass, 
-                                                    low = population_params['mmin'],
-                                                    high = population_params['mmax'],
-                                                )
+                                                    low = low,
+                                                    high = high,
+                                                ))
         
-                       
-            initial_samples[self.other_mass_coord] = sample_powerlaw(-1*MASS_ALPHAS[self.other_mass_coord],
+
+            initial_samples[self.other_mass_coord] = xp.array(sample_powerlaw(-1*MASS_ALPHAS[self.other_mass_coord],
                                                                     low = grids[self.other_mass_coord][0],
                                                                         high = grids[self.other_mass_coord][-1],
-                                                                        N = n_try)
-            initial_samples['p_draw'] *= pdf_powerlaw(initial_samples[self.other_mass_coord], 
+                                                                        N = n_try))
+            initial_samples['p_draw'] *= xp.array(pdf_powerlaw(initial_samples[self.other_mass_coord], 
                                                                                 -1*MASS_ALPHAS[self.other_mass_coord],
                                                                                 low = grids[self.other_mass_coord][0],
-                                                                                high = grids[self.other_mass_coord][-1])
+                                                                                high = grids[self.other_mass_coord][-1]))
+            
             probabilities = self.calculate_p_masses(initial_samples, {key: population_params[key] for key in self.model_args['mass']})
             M = max(probabilities / initial_samples['p_draw'])
-            keep = np.random.random(len(probabilities)) < (probabilities / (M *initial_samples['p_draw']))
+            keep = xp.random.random(len(probabilities)) < (probabilities / (M *initial_samples['p_draw']))
             for key in samples:
                 samples[key].extend(initial_samples[key][keep])
 
-            n_kept = np.sum(keep)
+            n_kept = xp.nansum(keep)
             efficiency = n_kept/n_try
             print(f"Using {n_try}, got {len(samples[self.mass_coordinates[0]])} out of target {N} samples after iteration {iteration}")
-            n_try = int((N - n_kept)/efficiency)
-
-            print(f"Efficiency: {efficiency}, trying {n_try} samples in next iteration")
-            print("-----------------------------------------------------------")
-            iteration += 1
+            if efficiency<0.0008:
+                # reduce sample size if it is too large... this should be made better in the future
+                print(f'Efficiency: {efficiency} is too low, sampling directly.')
+                if N>100000:
+                    N=100000
+                    print(f'Using capped number of samples: {N} to avoid lengthy computations.')
+                return self.draw_mass_proposal_samples_OLD(population_params, N, grids = MASS_GRIDS)
+            else: 
+                n_try = int((N - n_kept)/efficiency)
+                print(f"Efficiency: {efficiency}, trying {n_try} samples in next iteration")
+                print("-----------------------------------------------------------")
+                iteration += 1
 
         mass_proposal_samples =  {'mass_1_source': xp.array(samples['mass_1'])[:N], self.other_mass_coord: xp.array(samples[self.other_mass_coord])[:N]}
         return mass_proposal_samples
+
+    def draw_mass_proposal_samples_indipendent(self, population_params, N, grids = MASS_GRIDS):
+        
+        print("Drawing m1 and m2 samples")
+        prob = self.models['mass']({'mass_1': grids['mass_1'], 'mass_2': grids['mass_2']}, **{key: population_params[key] for key in self.model_args['mass']})
+        prob_interped = Interped(xx = grids['mass_1'], yy = prob)
+        mass_1_samples = prob_interped.sample(N)
+        prob_interped = Interped(xx = grids['mass_2'], yy = prob)
+        mass_2_samples = prob_interped.sample(N)
+        return {'mass_1_source': mass_1_samples, 'mass_2_source': xp.array(mass_2_samples)}
     
     def draw_mass_proposal_samples_OLD(self, population_params, N, grids = MASS_GRIDS):
         
         print("Drawing m1 samples")
         
-        m1_prob = self.models['mass'].p_m1({'mass_1': grids['mass_1']}, **{key: population_params[key] for key in self.model_args['mass'] if key != 'beta'})
+        print(type(self.models['mass']).__name__)
+        m1_keys, q_keys = get_mass_keys_for_sampling(population_params, type(self.models['mass']).__name__)
+        m1_prob = self.models['mass'].p_m1({'mass_1': grids['mass_1']}, **m1_keys)
         pm1_interped = Interped(xx = grids['mass_1'], yy = m1_prob)
         mass_1_source_samples = pm1_interped.sample(N)
         
@@ -303,7 +345,7 @@ class PopulationOmegaGW(object):
             #probs = self.models[self.other_mass_coord]({'mass_1': xp.array([m1_sample]), self.other_mass_coord: grids[self.other_mass_coord]}, **{key: population_params[key] for key in self.model_args[self.other_mass_coord]})
             if hasattr(self.models['mass'], '_q_interpolant'):
                 del self.models['mass']._q_interpolant
-            probs = self.models[self.other_mass_coord]({'mass_1': np.array([m1_sample]), self.other_mass_coord: grids[self.other_mass_coord]}, **{key: population_params[key] for key in self.model_args[self.other_mass_coord]})
+            probs = self.models[self.other_mass_coord]({'mass_1': np.array([m1_sample]), self.other_mass_coord: grids[self.other_mass_coord]}, **q_keys)
             mass_interped = Interped(xx = grids[self.other_mass_coord], yy = probs)
             other_mass_samples.append(mass_interped.sample())
         return {'mass_1_source': mass_1_source_samples, self.other_mass_coord: xp.array(other_mass_samples)}
@@ -312,7 +354,6 @@ class PopulationOmegaGW(object):
         
         print("Drawing redshift samples")
         z_prob = self.models['redshift']({'redshift': z_grid}, **{key: population_params[key] for key in self.model_args['redshift']})
-        print({key: population_params[key] for key in self.model_args['redshift']})
         pz_interped = Interped(xx = z_grid, yy=z_prob)
         z_samples = pz_interped.sample(N)
         
@@ -323,25 +364,74 @@ class PopulationOmegaGW(object):
         spin_samples = dict()
 
         if len(self.spin_models) > 0:   
-            for magnitude in ['a_1', 'a_2']:
-                probs = self.models[magnitude](grids, **{key: population_params[key] for key in self.model_args[magnitude]})
-                magnitudes_interped = Interped(xx = grids[magnitude], yy = probs)
-                spin_samples[magnitude] = magnitudes_interped.sample(N)
+            ind_spins = False
+            for mod in self.spin_models:
+                if 'a_1' in mod:
+                    ind_spins = True
+            
+            ind_tilts = False
+            for mod in self.spin_models:
+                if 'tilt_1' in mod:
+                    ind_tilts = True
 
-            for tilt in ['cos_tilt_1', 'cos_tilt_2']:
-                if tilt in self.spin_models:
-                    probs = self.models[tilt](grids, **{key: population_params[key] for key in self.model_args[tilt]})
-                    tilts_interped = Interped(xx = grids[tilt], yy = probs)
-                    spin_samples[tilt] = tilts_interped.sample(N)
+            if ind_spins:
+                for magnitude in ['a_1', 'a_2']:
+                    probs = self.models[magnitude](grids, **{key: population_params[key] for key in self.model_args[magnitude]})
+                    magnitudes_interped = Interped(xx = grids[magnitude], yy = probs)
+                    spin_samples[magnitude] = magnitudes_interped.sample(N)
+            else:
+                spin_samples.update(self.draw_spin_magnitude_proposal_samples(population_params, N))
+            
+            if ind_tilts:
+                for tilt in ['cos_tilt_1', 'cos_tilt_2']:
+                    if tilt in self.spin_models:
+                        probs = self.models[tilt](grids, **{key: population_params[key] for key in self.model_args[tilt]})
+                        tilts_interped = Interped(xx = grids[tilt], yy = probs)
+                        spin_samples[tilt] = tilts_interped.sample(N)
+            else:
+                try: spin_samples.update(self.draw_spin_tilt_proposal_samples(population_params, N))
+                except KeyError:
+                    pass
         return spin_samples
     
-    def draw_source_proposal_samples(self, fiducial_parameters, N):
+    def draw_spin_magnitude_proposal_samples(self, population_params, N, grids=SPIN_GRIDS):
+        prob = self.models['spin_magnitude']({'a_1': grids['a_1'], 'a_2': grids['a_2']}, **{key: population_params[key] for key in self.model_args['spin_magnitude']})
+        prob_interped = Interped(xx = grids['a_1'], yy = prob)
+        a_1_samples = prob_interped.sample(N)
+        prob_interped = Interped(xx = grids['a_2'], yy = prob)
+        a_2_samples = prob_interped.sample(N)
+        return {'a_1': a_1_samples, 'a_2': xp.array(a_2_samples)}
+    
+    def draw_spin_tilt_proposal_samples(self, population_params, N, grids=SPIN_GRIDS):
+        prob = self.models['spin_tilt']({'cos_tilt_1': grids['cos_tilt_1'], 'cos_tilt_2': grids['cos_tilt_2']}, **{key: population_params[key] for key in self.model_args['spin_tilt']})
+        prob_interped = Interped(xx = grids['cos_tilt_1'], yy = prob)
+        t_1_samples = prob_interped.sample(N)
+        prob_interped = Interped(xx = grids['cos_tilt_2'], yy = prob)
+        t_2_samples = prob_interped.sample(N)
+        return {'cos_tilt_1': t_1_samples, 'cos_tilt_2': xp.array(t_2_samples)}
+
+    def draw_source_proposal_samples(self, fiducial_parameters, N, **sampling_kwargs):
         
         proposal_samples = dict()
         mgrids = MASS_GRIDS.copy()
-        mgrids['mass_1'] = self.models['mass'].m1s
-        mass_samples = self.draw_mass_proposal_samples(fiducial_parameters, N, grids=mgrids)
-        z_grid = np.logspace(np.log10(0.0001), np.log10(self.models['redshift'].z_max), 10000)
+        try:
+            mgrids['mass_1'] = self.models['mass'].m1s
+            if self.other_mass_coord == 'mass_2': #this would make sense, right?
+                mgrids['mass_2'] = self.models['mass'].m1s
+        except AttributeError:
+            pass
+
+        try: 
+            if sampling_kwargs['mass']=='direct':
+                mass_samples = self.draw_mass_proposal_samples_OLD(fiducial_parameters, N, grids=mgrids)
+            elif sampling_kwargs['mass']=='indipendent':
+                mgrids['mass_2'] = sampling_kwargs['mass_2_grid']
+                mass_samples = self.draw_mass_proposal_samples_indipendent(fiducial_parameters, N, grids=mgrids)
+        except KeyError:
+            mass_samples = self.draw_mass_proposal_samples(fiducial_parameters, N, grids=mgrids)
+            if len(mass_samples['mass_1_source']) != N:
+                N = len(mass_samples['mass_1_source']) #make sure length change goes through
+        z_grid = xp.logspace(xp.log10(0.0001), xp.log10(self.models['redshift'].z_max), 10000)
         z_samples = self.draw_redshift_proposal_samples(z_grid, fiducial_parameters, N)
 
         spin_samples = self.draw_spin_parameter_proposal_samples(fiducial_parameters, N)
@@ -396,6 +486,7 @@ class PopulationOmegaGW(object):
             probabilities = self.calculate_probabilities(self.proposal_samples, Lambda)
             self.weights = (probabilities / self.pdraws)
             self.weights[np.where(probabilities==0.0)]=0.0
+            self.weights[np.where(probabilities<0.0)]=0.0
         else:
             self.weights = np.ones(self.N_proposal_samples)
 
@@ -536,4 +627,23 @@ def get_wave_en(inj_sample, waveform_generator, frequency_array):
     #could also do cubic interp but takes a bit longer
     #wave_energies.append(interp1d(waveform_frequencies, wave_en, fill_value=0, bounds_error=False, kind='cubic')(frequency_array))
     return np.interp(frequency_array, waveform_frequencies, wave_en)
+
+def get_mass_keys_for_sampling(population_params, mass_model_name):
+    m1_params = {}
+    q_params = {}
+    if mass_model_name == 'TwoPeakBrokenPowerLawSmoothedMassDistribution':
+        m1_keys = ['alpha_1' ,'alpha_2', 'mmin', 'mmax' , 'break_mass', 'lam_0' , 'lam_1' , 'mpp_1' , 'mpp_2','delta_m', 'sigpp_1', 'sigpp_2']
+        for key in m1_keys:
+            try: 
+                m1_params[key] = population_params[key]
+            except KeyError:
+                if key=='mmin':
+                    m1_params['mmin'] = population_params['mlow_1']
+                    q_params['mmin'] = population_params['mlow_2']
+                elif key=='delta_m':
+                    m1_params['delta_m'] = population_params['delta_m_1']
+                    q_params['delta_m'] = population_params['delta_m_2']
+                else: raise KeyError()
+    q_params['beta']=population_params['beta']
+    return m1_params, q_params
 
