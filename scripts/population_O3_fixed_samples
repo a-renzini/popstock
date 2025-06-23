@@ -17,10 +17,6 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-import sys
-
-sys.path.append("/home/arianna.renzini/PROJECTS/popstock")
-
 import argparse
 import distutils
 import json
@@ -118,7 +114,7 @@ new_omegas['Lambdas'] = []
 new_omegas['Neff'] = []
 new_omegas['omega_gw'] = []
 
-result = bilby.core.result.read_in_result(filename='/home/jacob.golomb/o3b-population-data/analyses/PowerLawPeak/o1o2o3_mass_c_iid_mag_iid_tilt_powerlaw_redshift_result.json')
+result = bilby.core.result.read_in_result(filename='../test_data/o1o2o3_mass_c_iid_mag_iid_tilt_powerlaw_redshift_result.json')
 lambda_samples = result.posterior.to_dict('list')
 
 print('Running trials...')
