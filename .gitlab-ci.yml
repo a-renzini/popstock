@@ -58,40 +58,40 @@ precommits-py3.9:
   <<: *precommits-python
   image: python:3.9
 
-documentation:
-  stage: documentation
-  image: python:3.9
-  before_script:
-    - apt-get -yqq update
-    - apt-get -yqq install pandoc
-    - pip install --upgrade pip setuptools
-    - pip install ipykernel ipython==8.12.0 jupyter
-    - pip install sphinx numpydoc nbsphinx sphinx_rtd_theme sphinx-tabs autodoc ipython-genutils
-    - pip install .
+# documentation:
+#   stage: documentation
+#   image: python:3.9
+#   before_script:
+#     - apt-get -yqq update
+#     - apt-get -yqq install pandoc
+#     - pip install --upgrade pip setuptools
+#     - pip install ipykernel ipython==8.12.0 jupyter
+#     - pip install sphinx numpydoc nbsphinx sphinx_rtd_theme sphinx-tabs autodoc ipython-genutils
+#     - pip install .
 
-  script:
-    - cd docs
-    - make clean
-    - make html
-    - cd -
+#   script:
+#     - cd docs
+#     - make clean
+#     - make html
+#     - cd -
 
-  artifacts:
-    paths:
-      - docs/_build
+#   artifacts:
+#     paths:
+#       - docs/_build
 
-pages:
-  stage: deploy
-  dependencies:
-    - documentation
-  script:
-    - mkdir public/
-    - mv docs/_build/html/* public/
-  artifacts:
-    paths:
-      - public
-    expire_in: 30 days
-  only:
-  - main
+# pages:
+#   stage: deploy
+#   dependencies:
+#     - documentation
+#   script:
+#     - mkdir public/
+#     - mv docs/_build/html/* public/
+#   artifacts:
+#     paths:
+#       - public
+#     expire_in: 30 days
+#   only:
+#   - main
 
 mirror-to-github:
   stage: deploy
@@ -104,6 +104,7 @@ mirror-to-github:
     # Set up SSH key for GitHub access
     - mkdir -p ~/.ssh
     - echo "$GITHUB_SSH_KEY" > ~/.ssh/id_rsa
+    - cp "$GITHUB_SSH_KEY" ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
 
     # Confirm file format (without printing key contents)
