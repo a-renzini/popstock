@@ -100,11 +100,19 @@ mirror-to-github:
     - apt-get update && apt-get install -y git curl git-lfs openssh-client
     - git lfs install
 
-    # Setup SSH
+    # Set up SSH key for GitHub access
     - mkdir -p ~/.ssh
     - echo "$GITHUB_SSH_KEY" > ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
+
+    # Confirm file format (without printing key contents)
+    - head -n 1 ~/.ssh/id_rsa | grep -q "BEGIN" || (echo "❌ SSH key appears invalid or misformatted" && exit 1)
+
+    # Add GitHub to known hosts
     - ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+    # Optional: debug SSH connection (safe; doesn't leak key)
+    - ssh -i ~/.ssh/id_rsa -T git@github.com || true
 
     # Configure git
     - git config --global user.name "GitLab CI"
@@ -117,3 +125,4 @@ mirror-to-github:
 
   only:
     - main
+
