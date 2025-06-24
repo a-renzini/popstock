@@ -98,7 +98,7 @@ mirror-to-github:
   image: debian:bullseye
   before_script:
     - apt-get update && apt-get install -y git curl git-lfs openssh-client
-    - git lfs install
+    #- git lfs install
     - git lfs update --force
 
     # Set up SSH key for GitHub access
