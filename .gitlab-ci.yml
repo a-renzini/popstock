@@ -93,3 +93,27 @@ pages:
   only:
   - main
 
+mirror-to-github:
+  stage: deploy
+  image: debian:bullseye
+  before_script:
+    - apt-get update && apt-get install -y git curl git-lfs openssh-client
+    - git lfs install
+
+    # Setup SSH
+    - mkdir -p ~/.ssh
+    - echo "$GITHUB_SSH_KEY" > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+    # Configure git
+    - git config --global user.name "GitLab CI"
+    - git config --global user.email "ci@example.com"
+
+  script:
+    - git remote add github git@github.com:a-renzini/popstock.git
+    - git push --mirror github
+    - git lfs push --all github
+
+  only:
+    - main
