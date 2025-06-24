@@ -58,73 +58,73 @@ precommits-py3.9:
   <<: *precommits-python
   image: python:3.9
 
-# documentation:
-#   stage: documentation
-#   image: python:3.9
-#   before_script:
-#     - apt-get -yqq update
-#     - apt-get -yqq install pandoc
-#     - pip install --upgrade pip setuptools
-#     - pip install ipykernel ipython==8.12.0 jupyter
-#     - pip install sphinx numpydoc nbsphinx sphinx_rtd_theme sphinx-tabs autodoc ipython-genutils
-#     - pip install .
-
-#   script:
-#     - cd docs
-#     - make clean
-#     - make html
-#     - cd -
-
-#   artifacts:
-#     paths:
-#       - docs/_build
-
-# pages:
-#   stage: deploy
-#   dependencies:
-#     - documentation
-#   script:
-#     - mkdir public/
-#     - mv docs/_build/html/* public/
-#   artifacts:
-#     paths:
-#       - public
-#     expire_in: 30 days
-#   only:
-#   - main
-
-mirror-to-github:
-  stage: deploy
-  image: debian:bullseye
+documentation:
+  stage: documentation
+  image: python:3.9
   before_script:
-    - apt-get update && apt-get install -y git curl git-lfs openssh-client
-    #- git lfs install
-    - git lfs update --force
-
-    # Set up SSH key for GitHub access
-    - mkdir -p ~/.ssh
-    - echo "$GITHUB_SSH_KEY" > ~/.ssh/id_rsa
-    - cp "$GITHUB_SSH_KEY" ~/.ssh/id_rsa
-    - chmod 600 ~/.ssh/id_rsa
-
-    # Confirm file format (without printing key contents)
-    - head -n 1 ~/.ssh/id_rsa | grep -q "BEGIN" || (echo "❌ SSH key appears invalid or misformatted" && exit 1)
-
-    # Add GitHub to known hosts
-    - ssh-keyscan github.com >> ~/.ssh/known_hosts
-
-    # Optional: debug SSH connection (safe; doesn't leak key)
-    - ssh -i ~/.ssh/id_rsa -T git@github.com || true
-
-    # Configure git
-    - git config --global user.name "GitLab CI"
-    - git config --global user.email "ci@example.com"
+    - apt-get -yqq update
+    - apt-get -yqq install pandoc
+    - pip install --upgrade pip setuptools
+    - pip install ipykernel ipython==8.12.0 jupyter
+    - pip install sphinx numpydoc nbsphinx sphinx_rtd_theme sphinx-tabs autodoc ipython-genutils
+    - pip install .
 
   script:
-    - git remote add github git@github.com:a-renzini/popstock.git
-    - git push --mirror github
-    - git lfs push --all github
+    - cd docs
+    - make clean
+    - make html
+    - cd -
 
+  artifacts:
+    paths:
+      - docs/_build
+
+pages:
+  stage: deploy
+  dependencies:
+    - documentation
+  script:
+    - mkdir public/
+    - mv docs/_build/html/* public/
+  artifacts:
+    paths:
+      - public
+    expire_in: 30 days
   only:
-    - main
+  - main
+
+# mirror-to-github:
+#   stage: deploy
+#   image: debian:bullseye
+#   before_script:
+#     - apt-get update && apt-get install -y git curl git-lfs openssh-client
+#     #- git lfs install
+#     - git lfs update --force
+
+#     # Set up SSH key for GitHub access
+#     - mkdir -p ~/.ssh
+#     - echo "$GITHUB_SSH_KEY" > ~/.ssh/id_rsa
+#     - cp "$GITHUB_SSH_KEY" ~/.ssh/id_rsa
+#     - chmod 600 ~/.ssh/id_rsa
+
+#     # Confirm file format (without printing key contents)
+#     - head -n 1 ~/.ssh/id_rsa | grep -q "BEGIN" || (echo "❌ SSH key appears invalid or misformatted" && exit 1)
+
+#     # Add GitHub to known hosts
+#     - ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+#     # Optional: debug SSH connection (safe; doesn't leak key)
+#     - ssh -i ~/.ssh/id_rsa -T git@github.com || true
+
+#     # Configure git
+#     - git config --global user.name "GitLab CI"
+#     - git config --global user.email "ci@example.com"
+
+#   script:
+#     - git remote add github git@github.com:a-renzini/popstock.git
+#     - git push --mirror github
+#     - git lfs push --all github
+
+#   only:
+#     - main
 
